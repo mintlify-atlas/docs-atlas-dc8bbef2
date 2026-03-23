@@ -1,0 +1,250 @@
+---
+title: Project structure
+description: An overview of all folder and file conventions in a Next.js App Router project, and how to organize your code.
+---
+
+This page provides an overview of all the folder and file conventions in Next.js, and recommendations for organizing your project.
+
+## Top-level folders
+
+Top-level folders are used to organize your application's code and static assets.
+
+| Folder | Description |
+| ------ | ----------- |
+| `app` | App Router |
+| `pages` | Pages Router (legacy) |
+| `public` | Static assets to be served |
+| `src` | Optional application source folder |
+
+## Top-level files
+
+Top-level files configure your application, manage dependencies, define environment variables, and integrate tooling.
+
+| File | Description |
+| ---- | ----------- |
+| `next.config.js` | Configuration file for Next.js |
+| `package.json` | Project dependencies and scripts |
+| `instrumentation.ts` | OpenTelemetry and instrumentation file |
+| `proxy.ts` | Next.js request proxy |
+| `.env` | Environment variables |
+| `.env.local` | Local environment variables |
+| `.env.production` | Production environment variables |
+| `.env.development` | Development environment variables |
+| `eslint.config.mjs` | Configuration file for ESLint |
+| `.gitignore` | Git files and folders to ignore |
+| `next-env.d.ts` | TypeScript declaration file for Next.js |
+| `tsconfig.json` | Configuration file for TypeScript |
+| `jsconfig.json` | Configuration file for JavaScript |
+
+<Warning>
+  `.env`, `.env.local`, `.env.production`, and `.env.development` should not be tracked by version control. Add them to `.gitignore`.
+</Warning>
+
+## Routing files
+
+Add `page` to expose a route, `layout` for shared UI, `loading` for skeletons, `error` for error boundaries, and `route` for API endpoints.
+
+| File | Extensions | Description |
+| ---- | ---------- | ----------- |
+| `layout` | `.js` `.jsx` `.tsx` | Layout |
+| `page` | `.js` `.jsx` `.tsx` | Page |
+| `loading` | `.js` `.jsx` `.tsx` | Loading UI |
+| `not-found` | `.js` `.jsx` `.tsx` | Not found UI |
+| `error` | `.js` `.jsx` `.tsx` | Error UI |
+| `global-error` | `.js` `.jsx` `.tsx` | Global error UI |
+| `route` | `.js` `.ts` | API endpoint |
+| `template` | `.js` `.jsx` `.tsx` | Re-rendered layout |
+| `default` | `.js` `.jsx` `.tsx` | Parallel route fallback page |
+
+## Nested routes
+
+Folders define URL segments. Nesting folders nests segments. Layouts at any level wrap their child segments. A route becomes publicly accessible when a `page` or `route` file exists in a segment.
+
+| Path | URL pattern | Notes |
+| ---- | ----------- | ----- |
+| `app/layout.tsx` | — | Root layout, wraps all routes |
+| `app/blog/layout.tsx` | — | Wraps `/blog` and descendants |
+| `app/page.tsx` | `/` | Public route |
+| `app/blog/page.tsx` | `/blog` | Public route |
+| `app/blog/authors/page.tsx` | `/blog/authors` | Public route |
+
+## Dynamic routes
+
+Parameterize segments with square brackets. Use `[segment]` for a single param, `[...segment]` for catch-all, and `[[...segment]]` for optional catch-all. Access values via the `params` prop.
+
+| Path | URL pattern |
+| ---- | ----------- |
+| `app/blog/[slug]/page.tsx` | `/blog/my-first-post` |
+| `app/shop/[...slug]/page.tsx` | `/shop/clothing`, `/shop/clothing/shirts` |
+| `app/docs/[[...slug]]/page.tsx` | `/docs`, `/docs/layouts-and-pages` |
+
+## Route groups and private folders
+
+Organize code without changing URLs with route groups `(group)`, and colocate non-routable files with private folders `_folder`.
+
+| Path | URL pattern | Notes |
+| ---- | ----------- | ----- |
+| `app/(marketing)/page.tsx` | `/` | Group omitted from URL |
+| `app/(shop)/cart/page.tsx` | `/cart` | Share layouts within `(shop)` |
+| `app/blog/_components/Post.tsx` | — | Not routable; safe place for UI utilities |
+| `app/blog/_lib/data.ts` | — | Not routable; safe place for utils |
+
+## Metadata file conventions
+
+### App icons
+
+| File | Extensions | Description |
+| ---- | ---------- | ----------- |
+| `favicon` | `.ico` | Favicon file |
+| `icon` | `.ico` `.jpg` `.jpeg` `.png` `.svg` | App icon file |
+| `icon` | `.js` `.ts` `.tsx` | Generated app icon |
+| `apple-icon` | `.jpg` `.jpeg` `.png` | Apple app icon file |
+| `apple-icon` | `.js` `.ts` `.tsx` | Generated Apple app icon |
+
+### Open Graph and Twitter images
+
+| File | Extensions | Description |
+| ---- | ---------- | ----------- |
+| `opengraph-image` | `.jpg` `.jpeg` `.png` `.gif` | Open Graph image file |
+| `opengraph-image` | `.js` `.ts` `.tsx` | Generated Open Graph image |
+| `twitter-image` | `.jpg` `.jpeg` `.png` `.gif` | Twitter image file |
+| `twitter-image` | `.js` `.ts` `.tsx` | Generated Twitter image |
+
+### SEO
+
+| File | Extensions | Description |
+| ---- | ---------- | ----------- |
+| `sitemap` | `.xml` | Sitemap file |
+| `sitemap` | `.js` `.ts` | Generated sitemap |
+| `robots` | `.txt` | Robots file |
+| `robots` | `.js` `.ts` | Generated robots file |
+
+## Component hierarchy
+
+The components defined in special files are rendered in a specific hierarchy within each route segment:
+
+1. `layout.js`
+2. `template.js`
+3. `error.js` (React error boundary)
+4. `loading.js` (React suspense boundary)
+5. `not-found.js` (React error boundary for not-found UI)
+6. `page.js` or nested `layout.js`
+
+Components are rendered recursively in nested routes, meaning the components of a route segment are nested inside the components of its parent segment.
+
+## Organizing your project
+
+Next.js is unopinionated about how you organize and colocate your project files. It provides several features to help.
+
+### Colocation
+
+In the `app` directory, nested folders define route structure. However, a route is not publicly accessible until a `page.js` or `route.js` file is added. This means project files can be safely colocated inside route segments without accidentally becoming routable.
+
+### Private folders
+
+Prefix a folder with an underscore to mark it as a private implementation detail: `_folderName`
+
+This opts the folder and all its subfolders out of routing. Useful for:
+
+- Separating UI logic from routing logic.
+- Organizing internal files consistently across a project.
+- Avoiding naming conflicts with future Next.js file conventions.
+
+<Note>
+  You can create URL segments that start with an underscore by prefixing the folder name with `%5F` (the URL-encoded underscore): `%5FfolderName`.
+</Note>
+
+### Route groups
+
+Wrap a folder in parentheses to create a route group: `(folderName)`
+
+The folder name is omitted from the URL path and is used only for organizational purposes. Route groups are useful for:
+
+- Organizing routes by site section, intent, or team (e.g. marketing pages, admin pages).
+- Enabling nested layouts in the same route segment level.
+- Creating multiple root layouts.
+
+### `src` folder
+
+Next.js supports storing application code (including `app`) inside an optional `src` folder. This separates application code from project configuration files that live in the root.
+
+## Project organization strategies
+
+Choose a strategy that works for your team and apply it consistently.
+
+<AccordionGroup>
+  <Accordion title="Store project files outside of app">
+    Store all application code in shared folders at the **root of your project** and keep the `app` directory purely for routing.
+
+    ```
+    ├── app/
+    │   ├── layout.tsx
+    │   └── page.tsx
+    ├── components/
+    │   └── button.tsx
+    ├── lib/
+    │   └── utils.ts
+    └── styles/
+        └── globals.css
+    ```
+  </Accordion>
+
+  <Accordion title="Store project files inside app">
+    Store all application code in shared folders at the **root of the `app` directory**.
+
+    ```
+    ├── app/
+    │   ├── layout.tsx
+    │   ├── page.tsx
+    │   ├── components/
+    │   │   └── button.tsx
+    │   └── lib/
+    │       └── utils.ts
+    ```
+  </Accordion>
+
+  <Accordion title="Split project files by feature or route">
+    Store globally shared code in the root `app` directory and split more specific code into the route segments that use it.
+
+    ```
+    ├── app/
+    │   ├── layout.tsx
+    │   ├── page.tsx
+    │   ├── components/       # shared
+    │   └── dashboard/
+    │       ├── page.tsx
+    │       └── components/   # dashboard-specific
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Organizing routes without affecting URLs
+
+To group related routes without changing the URL, use route groups. Folders in parentheses are omitted from the URL:
+
+```
+app/
+├── (marketing)/
+│   ├── layout.tsx    # marketing layout
+│   ├── page.tsx      # /
+│   └── about/
+│       └── page.tsx  # /about
+└── (shop)/
+    ├── layout.tsx    # shop layout
+    └── cart/
+        └── page.tsx  # /cart
+```
+
+Even though routes inside `(marketing)` and `(shop)` share the same URL hierarchy, each group can have its own `layout.js`.
+
+### Creating multiple root layouts
+
+To create multiple root layouts, remove the top-level `layout.js` file and add a `layout.js` inside each route group. Each root layout must include `<html>` and `<body>` tags.
+
+```
+app/
+├── (marketing)/
+│   └── layout.tsx  # root layout for marketing
+└── (shop)/
+    └── layout.tsx  # root layout for shop
+```

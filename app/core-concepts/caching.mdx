@@ -1,0 +1,287 @@
+---
+title: Caching
+description: Learn how to cache data and UI in Next.js using the use cache directive, cacheLife, cacheTag, and Partial Prerendering.
+---
+
+Caching stores the result of data fetching and computations so that future requests can be served faster. Next.js uses the `use cache` directive to control what gets cached and for how long.
+
+<Note>
+  This page covers caching with Cache Components, enabled by setting `cacheComponents: true` in your `next.config.ts`. For the previous model, see the [Caching and Revalidating (Previous Model)](/app/core-concepts/caching) guide.
+</Note>
+
+## Enabling Cache Components
+
+```typescript filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+```
+
+## The `use cache` directive
+
+The `use cache` directive caches the return value of async functions and components. Apply it at two levels:
+
+- **Data-level**: Cache a function that fetches or computes data
+- **UI-level**: Cache an entire component or page
+
+Arguments and any closed-over values from parent scopes automatically become part of the cache key, so different inputs produce separate cache entries.
+
+### Data-level caching
+
+```tsx filename="app/lib/data.ts"
+import { cacheLife } from 'next/cache'
+
+export async function getUsers() {
+  'use cache'
+  cacheLife('hours')
+  return db.query('SELECT * FROM users')
+}
+```
+
+Data-level caching is useful when the same data is used across multiple components, or when you want to cache the data independently from the UI.
+
+### UI-level caching
+
+```tsx filename="app/page.tsx"
+import { cacheLife } from 'next/cache'
+
+export default async function Page() {
+  'use cache'
+  cacheLife('hours')
+
+  const users = await db.query('SELECT * FROM users')
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+<Note>
+  If you add `'use cache'` at the top of a file, all exported functions in the file will be cached.
+</Note>
+
+## cacheLife profiles
+
+`cacheLife` controls how long cached data remains valid. It accepts a profile name or a custom configuration object:
+
+| Profile   | `stale` | `revalidate` | `expire`    |
+| --------- | ------- | ------------ | ----------- |
+| `seconds` | 0       | 1s           | 60s         |
+| `minutes` | 5m      | 1m           | 1h          |
+| `hours`   | 5m      | 1h           | 1d          |
+| `days`    | 5m      | 1d           | 1w          |
+| `weeks`   | 5m      | 1w           | 30d         |
+| `max`     | 5m      | 30d          | ~indefinite |
+
+For fine-grained control, pass a configuration object:
+
+```tsx
+'use cache'
+cacheLife({
+  stale: 3600,    // 1 hour until considered stale
+  revalidate: 7200, // 2 hours until revalidated
+  expire: 86400,  // 1 day until expired
+})
+```
+
+## Streaming uncached data
+
+For components that require fresh data on every request, do not use `"use cache"`. Wrap them in `<Suspense>` instead — React renders the fallback immediately and streams in the resolved content:
+
+```tsx filename="page.tsx"
+import { Suspense } from 'react'
+
+async function LatestPosts() {
+  const data = await fetch('https://api.example.com/posts')
+  const posts = await data.json()
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+
+export default function Page() {
+  return (
+    <>
+      <h1>My Blog</h1>
+      <Suspense fallback={<p>Loading posts...</p>}>
+        <LatestPosts />
+      </Suspense>
+    </>
+  )
+}
+```
+
+## Working with runtime APIs
+
+Runtime APIs (`cookies`, `headers`, `searchParams`) are only available at request time. Components that access them should be wrapped in `<Suspense>`:
+
+```tsx filename="page.tsx"
+import { cookies } from 'next/headers'
+import { Suspense } from 'react'
+
+async function UserGreeting() {
+  const cookieStore = await cookies()
+  const theme = cookieStore.get('theme')?.value || 'light'
+  return <p>Your theme: {theme}</p>
+}
+
+export default function Page() {
+  return (
+    <>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <UserGreeting />
+      </Suspense>
+    </>
+  )
+}
+```
+
+### Passing runtime values to cached functions
+
+Extract values from runtime APIs and pass them as arguments to cached functions:
+
+```tsx filename="app/profile/page.tsx"
+import { cookies } from 'next/headers'
+import { Suspense } from 'react'
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProfileContent />
+    </Suspense>
+  )
+}
+
+// Reads runtime data (not cached)
+async function ProfileContent() {
+  const session = (await cookies()).get('session')?.value
+  return <CachedContent sessionId={session} />
+}
+
+// Receives the extracted value as a prop (sessionId becomes part of cache key)
+async function CachedContent({ sessionId }: { sessionId: string }) {
+  'use cache'
+  const data = await fetchUserData(sessionId)
+  return <div>{data}</div>
+}
+```
+
+## How rendering works
+
+At build time, Next.js renders your route's component tree. How each component is handled depends on the APIs it uses:
+
+- `use cache`: the result is cached and included in the static shell
+- `<Suspense>`: the fallback UI is included in the static shell; content streams at request time
+- Deterministic operations (pure computations, module imports): automatically included in the static shell
+
+This approach is called **Partial Prerendering (PPR)** — the default behavior with Cache Components.
+
+## Complete example
+
+Here's how static content, cached dynamic content, and streaming dynamic content work together:
+
+```tsx filename="app/blog/page.tsx"
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheLife, cacheTag, updateTag } from 'next/cache'
+import Link from 'next/link'
+
+export default function BlogPage() {
+  return (
+    <>
+      {/* Static content — prerendered automatically */}
+      <header>
+        <h1>Our Blog</h1>
+        <nav>
+          <Link href="/">Home</Link> | <Link href="/about">About</Link>
+        </nav>
+      </header>
+
+      {/* Cached dynamic content — included in the static shell */}
+      <BlogPosts />
+
+      {/* Runtime dynamic content — streams at request time */}
+      <Suspense fallback={<p>Loading your preferences...</p>}>
+        <UserPreferences />
+      </Suspense>
+    </>
+  )
+}
+
+// Everyone sees the same blog posts (revalidated every hour)
+async function BlogPosts() {
+  'use cache'
+  cacheLife('hours')
+  cacheTag('posts')
+
+  const res = await fetch('https://api.vercel.app/blog')
+  const posts = await res.json()
+
+  return (
+    <section>
+      <h2>Latest Posts</h2>
+      <ul>
+        {posts.slice(0, 5).map((post: any) => (
+          <li key={post.id}>
+            <h3>{post.title}</h3>
+            <p>By {post.author} on {post.date}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// Personalized per user — streams at request time
+async function UserPreferences() {
+  const theme = (await cookies()).get('theme')?.value || 'light'
+  const favoriteCategory = (await cookies()).get('category')?.value
+
+  return (
+    <aside>
+      <p>Your theme: {theme}</p>
+      {favoriteCategory && <p>Favorite category: {favoriteCategory}</p>}
+    </aside>
+  )
+}
+```
+
+## Opting out of the static shell
+
+Placing an empty `<Suspense>` fallback above the document body causes the entire app to defer to request time:
+
+```tsx filename="app/layout.tsx"
+import { Suspense } from 'react'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <Suspense fallback={null}>
+        <body>{children}</body>
+      </Suspense>
+    </html>
+  )
+}
+```
+
+<Warning>
+  Because the fallback is `null`, there is no static shell to send immediately. Every request blocks until the page is fully rendered. Use this sparingly and only for specific routes.
+</Warning>

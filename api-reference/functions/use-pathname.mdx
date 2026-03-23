@@ -1,0 +1,93 @@
+---
+title: usePathname
+description: API reference for the usePathname hook, used to read the current URL pathname in Client Components.
+---
+
+`usePathname` is a **Client Component** hook that returns the current URL's **pathname**.
+
+```typescript app/example-client-component.tsx
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export default function ExampleClientComponent() {
+  const pathname = usePathname()
+  return <p>Current pathname: {pathname}</p>
+}
+```
+
+## Parameters
+
+`usePathname` takes no parameters.
+
+## Returns
+
+Returns a `string` containing the current URL's pathname.
+
+| URL | Returned value |
+| --- | --- |
+| `/` | `'/'` |
+| `/dashboard` | `'/dashboard'` |
+| `/dashboard?v=2` | `'/dashboard'` |
+| `/blog/hello-world` | `'/blog/hello-world'` |
+
+## Good to know
+
+- Reading the current URL from a Server Component is not supported by design, to preserve layout state across page navigations.
+- `usePathname` may return `null` in the Pages Router when the router is not yet initialized (e.g. during fallback routes or Automatic Static Optimization).
+- When [`cacheComponents`](/api-reference/config/next-config-js) is enabled, `usePathname` may require a `Suspense` boundary if the route has a dynamic param (optional if you use `generateStaticParams`).
+- If your page is statically prerendered and your app uses [rewrites](/api-reference/config/next-config-js), the pathname read by `usePathname()` on the client may differ from what the server rendered, causing hydration mismatch errors. See the [example below](#avoid-hydration-mismatch-with-rewrites) for a mitigation pattern.
+
+## Examples
+
+### Reacting to route changes
+
+```typescript app/example-client-component.tsx
+'use client'
+
+import { useEffect } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
+
+function ExampleClientComponent() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Do something when the route changes...
+  }, [pathname, searchParams])
+}
+```
+
+### Avoid hydration mismatch with rewrites
+
+When a page is prerendered and later reached through a rewrite, the browser URL may differ from what `usePathname()` returns on the server. Design the UI so only a small, isolated part depends on the client pathname:
+
+```typescript app/example-client-component.tsx
+'use client'
+
+import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+
+export default function PathnameBadge() {
+  const pathname = usePathname()
+  const [clientPathname, setClientPathname] = useState('')
+
+  useEffect(() => {
+    setClientPathname(pathname)
+  }, [pathname])
+
+  return (
+    <p>
+      Current pathname: <span>{clientPathname}</span>
+    </p>
+  )
+}
+```
+
+This renders an empty string on the server (avoiding mismatch) and populates after hydration.
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.0.0` | `usePathname` introduced. |

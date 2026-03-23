@@ -1,0 +1,117 @@
+---
+title: Turbopack
+description: Turbopack is a Rust-based incremental bundler built into Next.js. Learn how it works, why it's fast, and how it differs from Webpack.
+---
+
+Turbopack is a Rust-based incremental bundler integrated into Next.js. It is the default bundler for both `next dev` and `next build`.
+
+## Why Turbopack is fast
+
+Turbopack's performance comes from two core design principles:
+
+<CardGroup cols={2}>
+  <Card title="Demand-driven evaluation" icon="bolt">
+    Turbopack only processes the modules your application actually requests. On first load, only the modules needed to render the current page are compiled. Unvisited routes are compiled lazily.
+  </Card>
+  <Card title="Persistent caching" icon="database">
+    Build artifacts are cached to disk between runs. On subsequent starts, only modules that have changed (or depend on changed modules) are recompiled. Cold starts after the first build are significantly faster.
+  </Card>
+</CardGroup>
+
+Internally, Turbopack models the build as a reactive computation graph. Each file and transform is a node; edges represent dependencies. When a file changes, only the affected subgraph is invalidated and recomputed.
+
+## Repository structure
+
+Turbopack lives in the `turbopack/` directory of the Next.js monorepo, managed as a git subtree:
+
+```text
+turbopack/
+├── crates/         # Rust crates (core bundler logic)
+├── packages/       # JavaScript packages
+├── scripts/        # Build and utility scripts
+└── xtask/          # Cargo xtask runner
+```
+
+## How Turbopack differs from Webpack
+
+| | Webpack | Turbopack |
+|---|---|---|
+| Language | JavaScript | Rust |
+| Evaluation | Eager (full graph) | Demand-driven (on-request) |
+| Caching | In-memory only | In-memory + persistent disk cache |
+| Parallelism | Limited (single-threaded by default) | Native multi-threading |
+| Plugin API | Mature, extensive | Growing — not fully compatible with Webpack plugins |
+| Default since | Next.js v1 | Next.js v15 (dev), v15 (build) |
+
+<Warning>
+  Turbopack does not support the Webpack plugin API. If you rely on custom Webpack plugins, you will need to use Webpack explicitly.
+</Warning>
+
+## Forcing Webpack
+
+If you need to use Webpack instead of Turbopack, pass the `--webpack` flag:
+
+<CodeGroup>
+
+```bash dev
+next dev --webpack
+```
+
+```bash build
+next build --webpack
+```
+
+</CodeGroup>
+
+<Note>
+  There is no `--no-turbopack` flag. Use `--webpack` to opt out.
+</Note>
+
+## Configuring Turbopack in Next.js
+
+You can customize Turbopack behavior in `next.config.js` under the `turbopack` key:
+
+```js filename="next.config.js"
+module.exports = {
+  turbopack: {
+    // Add custom module resolution rules
+    resolveAlias: {
+      'underscore': 'lodash',
+    },
+    // Override file extensions for module resolution
+    resolveExtensions: [
+      '.mdx',
+      '.tsx',
+      '.ts',
+      '.jsx',
+      '.js',
+      '.mjs',
+      '.json',
+    ],
+  },
+}
+```
+
+See the [Turbopack configuration reference](/api-reference/config/turbopack) for the full list of options.
+
+## Analyzing bundles with Turbopack
+
+Turbopack includes a build analysis tool available in the `.next/analyze/` output after a production build. You can inspect it with:
+
+```bash
+next build --turbopack
+```
+
+The build directory also includes `turbopack-analyze/` helpers for programmatic inspection of the bundle graph.
+
+## Current status
+
+Turbopack is stable and the default in Next.js 15. Ongoing work focuses on:
+
+- Expanding coverage of Webpack plugin APIs
+- Improving persistent cache invalidation accuracy
+- Reducing memory usage for very large applications
+
+<Tip>
+  When switching branches or pulling significant changes, delete stale native binaries if Turbopack produces unexpected errors: remove `packages/next-swc/native/*.node` and run `pnpm install` to fetch the npm-published binary.
+</Tip>

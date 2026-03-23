@@ -1,0 +1,172 @@
+---
+title: "instrumentation.js"
+description: "API reference for the instrumentation.js file convention. Integrate observability tools, track performance, and handle server-side errors across your application."
+---
+
+The `instrumentation.js|ts` file integrates observability tools into your application, enabling performance tracking, behavior monitoring, and production debugging.
+
+Place the file at the **root** of your project, or inside a `src` folder if you use one.
+
+```ts instrumentation.ts
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel('next-app')
+}
+```
+
+## Exports
+
+### `register` (optional)
+
+Called **once** when a new Next.js server instance starts. Must complete before the server handles any requests. Can be async.
+
+```ts instrumentation.ts
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel('next-app')
+}
+```
+
+### `onRequestError` (optional)
+
+Called whenever the Next.js server captures a request error. Use it to report errors to any custom observability provider.
+
+```ts instrumentation.ts
+import { type Instrumentation } from 'next'
+
+export const onRequestError: Instrumentation.onRequestError = async (
+  err,
+  request,
+  context
+) => {
+  await fetch('https://my-error-service.example.com/report', {
+    method: 'POST',
+    body: JSON.stringify({
+      message: err.message,
+      digest: err.digest,
+      request,
+      context,
+    }),
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+<Note>
+  If you run async tasks in `onRequestError`, make sure to `await` them. The function is invoked when Next.js captures the error, so unresolved promises may be lost.
+</Note>
+
+#### Parameters
+
+<ParamField path="error" type="Error & { digest: string }">
+  The caught error. Always an `Error` instance. The `digest` property is a unique ID for the error instance, useful for correlating with server logs.
+
+  The error may not be the original thrown instance — React may process Server Component errors. Use `digest` to identify the original error type.
+</ParamField>
+
+<ParamField path="request" type="object">
+  Read-only information about the request that caused the error.
+
+  ```ts
+  {
+    path: string    // e.g. /blog?name=foo
+    method: string  // e.g. GET, POST
+    headers: { [key: string]: string | string[] }
+  }
+  ```
+</ParamField>
+
+<ParamField path="context" type="object">
+  Context about where the error occurred.
+
+  ```ts
+  {
+    routerKind: 'Pages Router' | 'App Router'
+    routePath: string          // e.g. /app/blog/[dynamic]
+    routeType: 'render' | 'route' | 'action' | 'proxy'
+    renderSource:
+      | 'react-server-components'
+      | 'react-server-components-payload'
+      | 'server-rendering'
+    revalidateReason: 'on-demand' | 'stale' | undefined
+    renderType: 'dynamic' | 'dynamic-resume'
+  }
+  ```
+</ParamField>
+
+## Targeting a specific runtime
+
+The file runs in both Node.js and Edge runtimes. Use `process.env.NEXT_RUNTIME` to conditionally load runtime-specific code:
+
+```js instrumentation.js
+export function register() {
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    return require('./register.edge')
+  } else {
+    return require('./register.node')
+  }
+}
+
+export function onRequestError() {
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    return require('./on-request-error.edge')
+  } else {
+    return require('./on-request-error.node')
+  }
+}
+```
+
+## Examples
+
+### OpenTelemetry setup
+
+```ts instrumentation.ts
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel({
+    serviceName: 'my-next-app',
+  })
+}
+```
+
+### Reporting errors to Sentry
+
+```ts instrumentation.ts
+import * as Sentry from '@sentry/nextjs'
+
+export function register() {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+  })
+}
+
+export async function onRequestError(err, request, context) {
+  await Sentry.captureRequestError(err, { request, context })
+}
+```
+
+### Custom error logging
+
+```ts instrumentation.ts
+export async function onRequestError(err, request, context) {
+  // Only log render errors from the App Router
+  if (context.routerKind === 'App Router' && context.routeType === 'render') {
+    console.error('[App Router Render Error]', {
+      path: request.path,
+      digest: err.digest,
+      message: err.message,
+    })
+  }
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.0.0` | `onRequestError` introduced; `instrumentation` stable |
+| `v14.0.4` | Turbopack support for `instrumentation` |
+| `v13.2.0` | `instrumentation` introduced as experimental |

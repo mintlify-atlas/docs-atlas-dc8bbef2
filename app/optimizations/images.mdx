@@ -1,0 +1,298 @@
+---
+title: Images
+description: Optimize images in your Next.js application with the built-in next/image component.
+---
+
+The Next.js `<Image>` component extends the HTML `<img>` element with automatic optimization:
+
+- **Size optimization** — automatically serves correctly sized images for each device using modern formats like WebP.
+- **Visual stability** — prevents [Cumulative Layout Shift](https://web.dev/articles/cls) while images load.
+- **Faster page loads** — lazy-loads images by default using native browser lazy loading, with optional blur-up placeholders.
+- **Asset flexibility** — resizes images on demand, even from remote servers.
+
+## Basic usage
+
+Import `Image` from `next/image` and render it in your component:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+```jsx app/page.js
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+</CodeGroup>
+
+## Local images
+
+Store static files like images under a `public` folder in the project root. Files inside `public` are accessible from the base URL (`/`).
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import Image from 'next/image'
+import ProfileImage from './profile.png'
+
+export default function Page() {
+  return (
+    <Image
+      src={ProfileImage}
+      alt="Picture of the author"
+      // width and height are automatically provided
+      // blurDataURL is automatically provided
+      // placeholder="blur" // Optional blur-up while loading
+    />
+  )
+}
+```
+
+```jsx app/page.js
+import Image from 'next/image'
+import ProfileImage from './profile.png'
+
+export default function Page() {
+  return (
+    <Image
+      src={ProfileImage}
+      alt="Picture of the author"
+      // width and height are automatically provided
+      // blurDataURL is automatically provided
+    />
+  )
+}
+```
+
+</CodeGroup>
+
+<Note>
+When you statically import an image, Next.js automatically determines its intrinsic `width` and `height` from the file. These values prevent layout shift while the image loads.
+</Note>
+
+## Remote images
+
+To use a remote image, provide a URL string for `src`:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="https://s3.amazonaws.com/my-bucket/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+```jsx app/page.js
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="https://s3.amazonaws.com/my-bucket/profile.png"
+      alt="Picture of the author"
+      width={500}
+      height={500}
+    />
+  )
+}
+```
+
+</CodeGroup>
+
+Since Next.js cannot inspect remote files at build time, you must provide `width`, `height`, and optionally `blurDataURL` manually.
+
+### Allowing remote patterns
+
+To safely allow images from remote servers, define the permitted URL patterns in `next.config.js`:
+
+<CodeGroup>
+
+```ts next.config.ts
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 's3.amazonaws.com',
+        port: '',
+        pathname: '/my-bucket/**',
+        search: '',
+      },
+    ],
+  },
+}
+
+export default config
+```
+
+```js next.config.js
+module.exports = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 's3.amazonaws.com',
+        port: '',
+        pathname: '/my-bucket/**',
+        search: '',
+      },
+    ],
+  },
+}
+```
+
+</CodeGroup>
+
+<Warning>
+Be as specific as possible with `remotePatterns` to prevent malicious use. Wildcards in `hostname` increase the attack surface.
+</Warning>
+
+## Props
+
+### Required props
+
+<ParamField path="src" type="string | StaticImport" required>
+  The image source. Either a path string (for local files in `public/` or remote URLs) or a statically imported image file.
+</ParamField>
+
+<ParamField path="alt" type="string" required>
+  Describes the image for screen readers and search engines. Use an empty string (`alt=""`) for decorative images.
+</ParamField>
+
+### Sizing props
+
+<ParamField path="width" type="number">
+  The intrinsic width of the image in pixels. Required for remote images unless `fill` is used. Omit for statically imported images (auto-detected).
+</ParamField>
+
+<ParamField path="height" type="number">
+  The intrinsic height of the image in pixels. Required for remote images unless `fill` is used. Omit for statically imported images (auto-detected).
+</ParamField>
+
+<ParamField path="fill" type="boolean">
+  Causes the image to fill the parent element. The parent must have `position: relative`, `position: fixed`, or `position: absolute`. Useful when the image dimensions are unknown.
+</ParamField>
+
+<ParamField path="sizes" type="string">
+  A string similar to `media queries` that provides information about how wide the image will be at different breakpoints. Greatly affects performance for images using `fill` or styled to be responsive.
+
+  Example: `"(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"`
+</ParamField>
+
+### Optional props
+
+<ParamField path="quality" type="number" default="75">
+  Optimization quality for lossy formats. An integer between `1` and `100`.
+</ParamField>
+
+<ParamField path="preload" type="boolean">
+  When `true`, the image is preloaded. Useful for the largest image in the initial viewport (similar to the deprecated `priority` prop).
+</ParamField>
+
+<ParamField path="loading" type="'lazy' | 'eager'" default="'lazy'">
+  The loading behavior. `'lazy'` defers loading until the image is near the viewport. `'eager'` loads immediately.
+</ParamField>
+
+<ParamField path="placeholder" type="'blur' | 'empty' | 'data:image/...'" default="'empty'">
+  The placeholder to show while the image loads.
+  - `'blur'` — uses `blurDataURL` as the placeholder (auto-generated for static imports).
+  - `'empty'` — no placeholder.
+  - `'data:image/...'` — a custom Data URL used as the placeholder.
+</ParamField>
+
+<ParamField path="blurDataURL" type="string">
+  A base64-encoded Data URL used as the blur placeholder when `placeholder="blur"`. Required for remote images when using blur placeholders.
+</ParamField>
+
+<ParamField path="unoptimized" type="boolean" default="false">
+  When `true`, the image is served as-is without changing quality, size, or format. Useful for images that are already optimized.
+</ParamField>
+
+<ParamField path="loader" type="function">
+  A custom function used to resolve image URLs. Overrides the default Next.js image loader.
+
+  ```tsx
+  const myLoader = ({ src, width, quality }) => {
+    return `https://example.com/${src}?w=${width}&q=${quality || 75}`
+  }
+  ```
+</ParamField>
+
+## Fill mode
+
+Use `fill` to make an image expand to cover its parent container. The parent must have a defined size and `position: relative`:
+
+```tsx app/page.tsx
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '400px' }}>
+      <Image
+        src="/hero.jpg"
+        alt="Hero image"
+        fill
+        style={{ objectFit: 'cover' }}
+      />
+    </div>
+  )
+}
+```
+
+## Priority loading
+
+For images that appear above the fold (such as a hero image or the largest element on the page), set `preload` to `true` to avoid lazy loading:
+
+```tsx app/page.tsx
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="/hero.jpg"
+      alt="Hero banner"
+      width={1200}
+      height={600}
+      preload
+    />
+  )
+}
+```
+
+<Tip>
+Mark the Largest Contentful Paint (LCP) image on each page with `preload` to improve your Core Web Vitals score.
+</Tip>

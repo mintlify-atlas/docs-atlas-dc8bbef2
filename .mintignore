@@ -5,3 +5,9 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# Leftover starter kit files
+essentials/
+ai-tools/
+quickstart.mdx
+development.mdx

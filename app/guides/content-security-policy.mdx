@@ -1,0 +1,229 @@
+---
+title: Content Security Policy
+description: Learn how to configure a Content Security Policy (CSP) for your Next.js application using nonces with Middleware or static headers in next.config.js.
+---
+
+A [Content Security Policy (CSP)](https://developer.mozilla.org/docs/Web/HTTP/CSP) protects your Next.js application against cross-site scripting (XSS), clickjacking, and other code injection attacks by specifying which content sources the browser is allowed to load.
+
+## Static CSP headers
+
+For applications that don't require nonces, set CSP headers directly in `next.config.js`:
+
+```js filename="next.config.js"
+const isDev = process.env.NODE_ENV === 'development'
+
+const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''};
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+<Note>
+  In development, `'unsafe-eval'` is required because React uses `eval` for enhanced debugging. It's not needed or used in production.
+</Note>
+
+## Nonce-based CSP
+
+A [nonce](https://developer.mozilla.org/docs/Web/HTML/Global_attributes/nonce) is a unique, random string generated per request that allows specific inline scripts to run even under a strict CSP. This is more secure than `'unsafe-inline'` but requires dynamic rendering for every page.
+
+### Adding nonces with middleware
+
+Generate a fresh nonce for each request in middleware and pass it as both a header and a CSP directive:
+
+```ts filename="middleware.ts"
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const isDev = process.env.NODE_ENV === 'development'
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''};
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+  `
+  const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, ' ').trim()
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  response.headers.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
+
+  return response
+}
+```
+
+Scope the matcher to avoid adding CSP headers to static assets and prefetch requests:
+
+```ts filename="middleware.ts"
+export const config = {
+  matcher: [
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+}
+```
+
+### How nonces work in Next.js
+
+Pages must be **dynamically rendered** to use nonces (static pages have no request headers at build time). Here's the flow:
+
+1. Middleware generates a nonce and adds it to the `Content-Security-Policy` and `x-nonce` headers
+2. During rendering, Next.js parses the CSP header and extracts the nonce from the `'nonce-{value}'` pattern
+3. Next.js automatically attaches the nonce to framework scripts, page bundles, inline styles, and `<Script>` components
+
+### Forcing dynamic rendering for nonces
+
+If a page doesn't use dynamic APIs, opt it into dynamic rendering:
+
+```tsx filename="app/page.tsx"
+import { connection } from 'next/server'
+
+export default async function Page() {
+  await connection()
+  // ...
+}
+```
+
+### Reading the nonce in a Server Component
+
+```tsx filename="app/page.tsx"
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce}
+    />
+  )
+}
+```
+
+### Performance implications of nonces
+
+Using nonces requires dynamic rendering for every page, which means:
+
+- Pages are generated on each request (no static caching)
+- CDNs cannot cache dynamic pages by default
+- Partial Prerendering (PPR) is incompatible with nonce-based CSP
+
+Use nonces when your security requirements prohibit `'unsafe-inline'` or when handling sensitive data.
+
+## Subresource Integrity (experimental)
+
+As an alternative to nonces, Next.js supports hash-based CSP using Subresource Integrity (SRI). SRI generates cryptographic hashes of JavaScript files at build time, allowing static generation while maintaining strict CSP.
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256', // or 'sha384' or 'sha512'
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+Benefits over nonces:
+- Pages can be statically generated and cached
+- CDN-compatible
+- Hashes are computed at build time
+
+Limitations:
+- Experimental; behavior may change
+- App Router only
+- Cannot handle dynamically generated scripts
+
+## Third-party scripts
+
+When using third-party scripts, add their domains to the CSP and pass the nonce:
+
+```tsx filename="app/layout.tsx"
+import { GoogleTagManager } from '@next/third-parties/google'
+import { headers } from 'next/headers'
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <GoogleTagManager gtmId="GTM-XYZ" nonce={nonce} />
+      </body>
+    </html>
+  )
+}
+```
+
+Update the CSP to allow the third-party domain:
+
+```ts filename="middleware.ts"
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com;
+  connect-src 'self' https://www.google-analytics.com;
+  img-src 'self' data: https://www.google-analytics.com;
+`
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Inline styles blocked | Use a CSS-in-JS library that supports nonces, or move styles to external files |
+| Dynamic imports blocked | Ensure `script-src` allows dynamic imports |
+| WebAssembly blocked | Add `'wasm-unsafe-eval'` to `script-src` |
+| Nonce not applied | Verify middleware runs on all necessary routes |
+| Static assets blocked | Check that `_next/static` is excluded from the nonce matcher |
+
+## Version history
+
+| Version | Changes |
+|---------|----------|
+| `v14.0.0` | Experimental SRI support added |
+| `v13.4.20` | Recommended nonce handling and CSP header parsing |

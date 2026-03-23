@@ -1,0 +1,224 @@
+---
+title: "<Link>"
+description: "Enable fast client-side navigation with the built-in next/link component, which extends the HTML <a> element with prefetching and SPA navigation."
+---
+
+The `<Link>` component extends the HTML `<a>` element to provide [prefetching](/api-reference/file-conventions/loading) and client-side navigation between routes. It is the primary way to navigate in Next.js.
+
+```jsx app/page.js
+import Link from 'next/link'
+
+export default function Page() {
+  return <Link href="/dashboard">Dashboard</Link>
+}
+```
+
+## Props
+
+<ParamField path="href" type="string | object" required>
+  The path or URL to navigate to. Accepts a string or a URL object.
+
+  ```jsx
+  // String
+  <Link href="/dashboard">Dashboard</Link>
+
+  // URL object
+  <Link href={{ pathname: '/about', query: { name: 'test' } }}>
+    About
+  </Link>
+  ```
+</ParamField>
+
+<ParamField path="replace" type="boolean" default="false">
+  When `true`, replaces the current history entry instead of pushing a new URL onto the browser history stack.
+
+  ```jsx
+  <Link href="/dashboard" replace>
+    Dashboard
+  </Link>
+  ```
+</ParamField>
+
+<ParamField path="scroll" type="boolean" default="true">
+  Controls scroll behavior on navigation. When `true`, Next.js maintains scroll position if the page is visible in the viewport, or scrolls to the top of the first page element if not.
+
+  Set to `false` to disable this behavior entirely.
+
+  ```jsx
+  <Link href="/dashboard" scroll={false}>
+    Dashboard
+  </Link>
+  ```
+</ParamField>
+
+<ParamField path="prefetch" type="boolean | null" default="null">
+  Controls prefetching. Prefetching only occurs in production.
+
+  - `null` or `"auto"` (default) — prefetches the full route for static routes; prefetches down to the nearest `loading.js` boundary for dynamic routes
+  - `true` — prefetches the full route for both static and dynamic routes
+  - `false` — disables prefetching on viewport entry and on hover
+
+  ```jsx
+  <Link href="/dashboard" prefetch={false}>
+    Dashboard
+  </Link>
+  ```
+</ParamField>
+
+<ParamField path="onNavigate" type="function">
+  Called during client-side navigation. The event object includes `preventDefault()` to cancel the navigation.
+
+  ```jsx
+  <Link
+    href="/dashboard"
+    onNavigate={(e) => {
+      console.log('Navigating...')
+      // e.preventDefault() to cancel
+    }}
+  >
+    Dashboard
+  </Link>
+  ```
+
+  <Note>
+    `onNavigate` differs from `onClick`: it only fires during SPA navigation, not for modifier-key clicks, external URLs, or links with the `download` attribute.
+  </Note>
+</ParamField>
+
+<ParamField path="transitionTypes" type="string[]">
+  A list of transition type strings passed to `React.addTransitionType` during navigation. Enables `<ViewTransition>` components to apply animations based on the navigation type.
+
+  ```jsx
+  <Link href="/about" transitionTypes={['slide-in']}>
+    About
+  </Link>
+  ```
+</ParamField>
+
+<Note>Standard `<a>` attributes such as `className`, `target`, and `rel` are passed through to the underlying `<a>` element.</Note>
+
+## Examples
+
+### Linking to dynamic segments
+
+Use template literals to generate links to dynamic routes.
+
+```jsx app/blog/post-list.js
+import Link from 'next/link'
+
+export default function PostList({ posts }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### Active link detection
+
+Use `usePathname()` to highlight the active link. Because `usePathname` is a client hook, extract nav links into a Client Component.
+
+```jsx app/ui/nav-links.js
+'use client'
+
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+
+export function Links() {
+  const pathname = usePathname()
+
+  return (
+    <nav>
+      <Link className={pathname === '/' ? 'active' : ''} href="/">
+        Home
+      </Link>
+      <Link className={pathname === '/about' ? 'active' : ''} href="/about">
+        About
+      </Link>
+    </nav>
+  )
+}
+```
+
+### Scrolling to a hash
+
+Append a `#` hash to the `href` to scroll to a specific element on the destination page.
+
+```jsx
+<Link href="/dashboard#settings">Settings</Link>
+```
+
+### Replacing instead of pushing history
+
+```jsx
+<Link href="/about" replace>
+  About us
+</Link>
+```
+
+### Disabling scroll to top
+
+```jsx
+<Link href="/dashboard" scroll={false}>
+  Dashboard
+</Link>
+```
+
+The same option is available when using `router.push()`:
+
+```js
+router.push('/dashboard', { scroll: false })
+```
+
+### Blocking navigation for unsaved changes
+
+Use `onNavigate` with React Context to block navigation when a form has unsaved changes.
+
+```jsx app/components/custom-link.js
+'use client'
+
+import Link from 'next/link'
+import { useNavigationBlocker } from '../contexts/navigation-blocker'
+
+export function CustomLink({ children, ...props }) {
+  const { isBlocked } = useNavigationBlocker()
+
+  return (
+    <Link
+      onNavigate={(e) => {
+        if (isBlocked && !window.confirm('You have unsaved changes. Leave anyway?')) {
+          e.preventDefault()
+        }
+      }}
+      {...props}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+### Scroll offset with sticky headers
+
+Next.js skips fixed and sticky elements when scrolling to a target. Compensate using `scroll-padding-top`:
+
+```css app/globals.css
+html {
+  scroll-padding-top: 64px; /* match your header height */
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.4.0` | `"auto"` added as alias for default `prefetch` behavior |
+| `v15.3.0` | `onNavigate` prop added |
+| `v13.0.0` | Child `<a>` tag no longer required |
+| `v10.0.0` | `href` for dynamic routes auto-resolved; `as` prop no longer needed |
+| `v1.0.0` | `next/link` introduced |

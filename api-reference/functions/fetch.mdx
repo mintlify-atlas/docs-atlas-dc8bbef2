@@ -1,0 +1,158 @@
+---
+title: fetch
+description: API reference for the extended fetch() function in Next.js, which adds server-side caching and revalidation options.
+---
+
+Next.js extends the native [Web `fetch()` API](https://developer.mozilla.org/docs/Web/API/Fetch_API) to allow each server-side request to set its own persistent caching and revalidation semantics.
+
+In the browser, the `cache` option controls interaction with the *browser's* HTTP cache. In Next.js server contexts, it controls interaction with the *framework's* server-side persistent cache.
+
+You can use `fetch` with `async/await` directly inside Server Components:
+
+```typescript app/page.tsx
+export default async function Page() {
+  const data = await fetch('https://api.example.com/blog')
+  const posts = await data.json()
+  return (
+    <ul>
+      {posts.map((post: { id: string; title: string }) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## `options.cache`
+
+Controls how the request interacts with Next.js's server-side cache.
+
+```typescript
+fetch('https://...', { cache: 'force-cache' | 'no-store' })
+```
+
+<ParamField body="cache" type="'force-cache' | 'no-store' | 'auto no cache'">
+  - **`'auto no cache'`** (default) — Fetches fresh from the remote server every request in development. During `next build`, fetches once as the route is statically prerendered. If [Request-time APIs](/app/core-concepts/routing#request-time-apis) are detected on the route, fetches on every request.
+  - **`'no-store'`** — Always fetches fresh from the remote server on every request, even without Request-time APIs.
+  - **`'force-cache'`** — Serves from the server-side cache if a fresh match exists; otherwise fetches from the remote server and updates the cache.
+</ParamField>
+
+## `options.next.revalidate`
+
+Sets the cache lifetime of a resource in seconds.
+
+```typescript
+fetch('https://...', { next: { revalidate: false | 0 | number } })
+```
+
+<ParamField body="next.revalidate" type="false | 0 | number">
+  - **`false`** — Cache indefinitely (equivalent to `Infinity`). The HTTP cache may still evict entries over time.
+  - **`0`** — Prevent the resource from being cached.
+  - **`number`** — Cache for at most `n` seconds.
+</ParamField>
+
+<Note>
+  - If an individual `fetch` sets a `revalidate` lower than the route's [default revalidate](/app/core-concepts/caching), the whole route interval is decreased.
+  - If two fetches to the same URL in the same route have different `revalidate` values, the lower value wins.
+  - Conflicting options like `{ revalidate: 3600, cache: 'no-store' }` are not allowed; both are ignored and a warning is printed in development.
+</Note>
+
+## `options.next.tags`
+
+Assigns cache tags to the response so it can be revalidated on-demand.
+
+```typescript
+fetch('https://...', { next: { tags: ['collection'] } })
+```
+
+<ParamField body="next.tags" type="string[]">
+  An array of cache tags. Max tag length: 256 characters. Max tags per request: 128.
+
+  Use [`revalidateTag`](/api-reference/functions/revalidate-tag) to invalidate all data with a given tag.
+</ParamField>
+
+## Memoization
+
+`GET` requests with the same URL and options are automatically [memoized](/app/core-concepts/routing#memoization) during a single server render pass. This means the same `fetch` call in multiple Server Components, layouts, or pages is executed only once and its result is shared.
+
+To opt out, pass an `AbortController` signal:
+
+```typescript
+const { signal } = new AbortController()
+await fetch(url, { signal })
+```
+
+<Note>
+  Memoization does not apply in Route Handlers, since they are not part of the React component tree.
+</Note>
+
+## Troubleshooting
+
+### `no-store` not showing fresh data in development
+
+Next.js caches `fetch` responses in Server Components across HMR refreshes in development for faster responses and reduced API costs. By default, the [HMR cache](/api-reference/config/next-config-js) applies to all `fetch` requests, including those with `cache: 'no-store'`.
+
+The cache is cleared on navigation or full-page reload. See [`serverComponentsHmrCache`](/api-reference/config/next-config-js) to configure this behavior.
+
+### Hard refresh ignores cache options in development
+
+In development, if the browser sends `cache-control: no-cache` (e.g. during a hard refresh or when DevTools cache is disabled), the `options.cache`, `options.next.revalidate`, and `options.next.tags` options are ignored and the request is served fresh from the source.
+
+## Examples
+
+### Caching with revalidation
+
+```typescript app/page.tsx
+export default async function Page() {
+  // Revalidate at most every 60 seconds
+  const data = await fetch('https://api.example.com/posts', {
+    next: { revalidate: 60 },
+  })
+  const posts = await data.json()
+  return <div>{posts.length} posts</div>
+}
+```
+
+### Tagging for on-demand revalidation
+
+```typescript app/page.tsx
+export default async function Page() {
+  const data = await fetch('https://api.example.com/posts', {
+    next: { tags: ['posts'] },
+  })
+  const posts = await data.json()
+  return <div>{posts.length} posts</div>
+}
+```
+
+Then invalidate with:
+
+```typescript app/actions.ts
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function updatePosts() {
+  await updatePostsInDatabase()
+  revalidateTag('posts', 'max')
+}
+```
+
+### Opting out of caching
+
+```typescript app/page.tsx
+export default async function Page() {
+  // Always fetch fresh data
+  const data = await fetch('https://api.example.com/posts', {
+    cache: 'no-store',
+  })
+  const posts = await data.json()
+  return <div>{posts.length} posts</div>
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.0.0` | Extended `fetch` introduced. |

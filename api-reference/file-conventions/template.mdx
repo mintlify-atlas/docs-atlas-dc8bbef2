@@ -1,0 +1,137 @@
+---
+title: "template.js"
+description: "API reference for the template.js file convention. Templates are similar to layouts but create a new component instance on every navigation, resetting state and effects."
+---
+
+A `template` file is similar to a [layout](/api-reference/file-conventions/layout) in that it wraps child routes. Unlike layouts that persist and maintain state across navigations, templates receive a unique key on each navigation, causing child Client Components to remount and reset their state.
+
+Use a template instead of a layout when you need to:
+
+- Resynchronize `useEffect` on every navigation
+- Reset the state of child Client Components on navigation (for example, an input field)
+- Show Suspense fallbacks on every navigation, not just the first load
+
+## Convention
+
+Export a default React component from a `template.js` file. The component receives a `children` prop.
+
+```jsx app/template.js
+export default function Template({ children }) {
+  return <div>{children}</div>
+}
+```
+
+In the component hierarchy, `template.js` renders between a layout and its children:
+
+```jsx
+<Layout>
+  {/* Template receives a unique key on each navigation */}
+  <Template key={routeParam}>{children}</Template>
+</Layout>
+```
+
+## Props
+
+<ParamField path="children" type="React.ReactNode" required>
+  The route content rendered inside the template.
+</ParamField>
+
+## Behavior
+
+- **Server Component by default** — templates run on the server unless you add `'use client'`
+- **Remounting** — a template remounts when its own segment (including dynamic params) changes. Child segment changes do not remount parent templates
+- **State reset** — Client Components inside the template reset their state on remount
+- **Effect re-run** — `useEffect` calls resynchronize on remount
+- **DOM reset** — DOM elements inside the template are fully recreated
+- **Search params** — changes to search params do not trigger a remount
+
+## Template vs layout
+
+| | Layout | Template |
+| --- | --- | --- |
+| Persists across navigations | Yes | No |
+| Maintains client state | Yes | No |
+| Re-runs effects on navigation | No | Yes |
+| Shows Suspense fallback every time | No | Yes |
+
+## Examples
+
+### Resetting form state on navigation
+
+When a user navigates to a new route within the same template segment, any input fields or form state inside the template will reset:
+
+```jsx app/blog/template.js
+export default function BlogTemplate({ children }) {
+  return (
+    <div>
+      <nav>{/* navigation */}</nav>
+      {children}
+    </div>
+  )
+}
+```
+
+Each time the route within `/blog` changes, the template remounts and any Client Components inside it reset their state.
+
+### Re-running analytics on navigation
+
+```jsx app/template.js
+'use client'
+
+import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+
+export default function Template({ children }) {
+  const pathname = usePathname()
+
+  useEffect(() => {
+    // fires on every navigation since the template remounts
+    analytics.page(pathname)
+  }, [pathname])
+
+  return <>{children}</>
+}
+```
+
+### Showing Suspense fallback on every navigation
+
+With a layout, Suspense boundaries only show the fallback on first load. With a template, the fallback shows on every navigation to the segment:
+
+```jsx app/feed/template.js
+import { Suspense } from 'react'
+import FeedSkeleton from './feed-skeleton'
+
+export default function FeedTemplate({ children }) {
+  return (
+    <Suspense fallback={<FeedSkeleton />}>
+      {children}
+    </Suspense>
+  )
+}
+```
+
+## Remounting behavior
+
+Given the following project structure:
+
+```
+app/
+├── layout.tsx
+├── template.tsx
+├── blog/
+│   ├── template.tsx
+│   ├── page.tsx
+│   └── [slug]/
+│       └── page.tsx
+```
+
+- Navigating from `/` to `/about` — root template remounts (segment changed)
+- Navigating from `/about` to `/blog` — root template remounts; blog template mounts
+- Navigating from `/blog` to `/blog/first-post` — root template does **not** remount; blog template remounts (child segment changed)
+- Navigating from `/blog/first-post` to `/blog/second-post` — root template does **not** remount; blog template remounts again
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.0.0` | `template` introduced |

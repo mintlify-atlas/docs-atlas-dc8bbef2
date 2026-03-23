@@ -1,0 +1,143 @@
+---
+title: after
+description: API reference for the after() function, used to schedule work to run after a response is sent.
+---
+
+`after` lets you schedule work to be executed **after a response (or prerender) is finished**. This is useful for tasks that should not block the response, such as logging, analytics, and other side effects.
+
+It can be used in [Server Components](/app/getting-started/server-and-client-components) (including [`generateMetadata`](/api-reference/functions/generate-metadata)), [Server Functions](/app/getting-started/mutating-data), [Route Handlers](/api-reference/file-conventions/route), and [Middleware](/api-reference/file-conventions/route).
+
+```typescript app/layout.tsx
+import { after } from 'next/server'
+import { log } from '@/app/utils'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  after(() => {
+    // Executes after the layout is rendered and sent to the user
+    log()
+  })
+  return <>{children}</>
+}
+```
+
+## Parameters
+
+<ParamField body="callback" type="() => void | Promise<void>" required>
+  A function to execute after the response or prerender is finished. Can be synchronous or asynchronous.
+</ParamField>
+
+## Duration
+
+`after` runs for the platform's default or configured max duration. You can configure the timeout with the [`maxDuration`](/api-reference/config/next-config-js) route segment config.
+
+## Good to know
+
+- `after` is **not** a [Request-time API](/app/core-concepts/routing#request-time-apis). Calling it does not make a route dynamic. If used in a static page, the callback runs at build time or when the page is revalidated.
+- `after` is executed even if the response did not complete successfully — including when an error is thrown or when `notFound()` or `redirect()` is called.
+- `after` calls can be nested. Utility functions can wrap `after` to add additional behavior.
+- Use React `cache` to deduplicate functions called inside `after`.
+
+## Using request APIs inside `after`
+
+Whether you can use `cookies()` and `headers()` inside `after` depends on where `after` is called:
+
+### In Route Handlers and Server Functions
+
+You can call `cookies()` and `headers()` directly inside the `after` callback:
+
+```typescript app/api/route.ts
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export async function POST(request: Request) {
+  // Perform mutation...
+
+  after(async () => {
+    const userAgent = (await headers()).get('user-agent') || 'unknown'
+    const sessionCookie =
+      (await cookies()).get('session-id')?.value || 'anonymous'
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return Response.json({ status: 'success' })
+}
+```
+
+### In Server Components (pages and layouts)
+
+Server Components **cannot** call `cookies()` or `headers()` inside the `after` callback. Read request data **before** `after` and pass the values in via closure:
+
+```typescript app/page.tsx
+import { after } from 'next/server'
+import { cookies, headers } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default async function Page() {
+  // Read request data before scheduling `after`
+  const userAgent = (await headers()).get('user-agent') || 'unknown'
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  after(() => {
+    logUserAction({ sessionCookie, userAgent })
+  })
+
+  return <h1>My Page</h1>
+}
+```
+
+<Warning>
+  Calling `cookies()` or `headers()` **inside** the `after` callback in a Server Component will throw a runtime error.
+</Warning>
+
+### With Cache Components
+
+When using [Cache Components](/app/core-concepts/caching), read request data in a dynamic (Suspense-wrapped) component and pass it into `after`:
+
+```typescript app/page.tsx
+import { Suspense } from 'react'
+import { after } from 'next/server'
+import { cookies } from 'next/headers'
+import { logUserAction } from '@/app/utils'
+
+export default function Page() {
+  return (
+    <>
+      <h1>Part of the static shell</h1>
+      <Suspense fallback={<p>Loading...</p>}>
+        <DynamicContent />
+      </Suspense>
+    </>
+  )
+}
+
+async function DynamicContent() {
+  const sessionCookie =
+    (await cookies()).get('session-id')?.value || 'anonymous'
+
+  after(() => {
+    logUserAction({ sessionCookie })
+  })
+
+  return <p>Your session: {sessionCookie}</p>
+}
+```
+
+## Platform support
+
+| Deployment option | Supported |
+| --- | --- |
+| Node.js server | Yes |
+| Docker container | Yes |
+| Static export | No |
+| Adapters | Platform-specific |
+
+`after` depends on a `waitUntil` primitive. When self-hosting, see the [self-hosting guide](/app/guides/self-hosting#after) for configuration.
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.1.0` | `after` became stable. |
+| `v15.0.0-rc` | `unstable_after` introduced. |

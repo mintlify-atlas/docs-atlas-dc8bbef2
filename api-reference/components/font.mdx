@@ -1,0 +1,330 @@
+---
+title: "Font"
+description: "Optimize web font loading with next/font, which self-hosts fonts at build time and eliminates external network requests for improved privacy and performance."
+---
+
+`next/font` automatically optimizes fonts and removes external network requests. It includes built-in self-hosting for any font file, preventing layout shift and improving loading performance.
+
+Google Fonts are downloaded at build time and served with your static assets. No requests are sent to Google by the browser.
+
+<Tabs>
+  <Tab title="Google font">
+    ```jsx app/layout.js
+    import { Inter } from 'next/font/google'
+
+    const inter = Inter({
+      subsets: ['latin'],
+      display: 'swap',
+    })
+
+    export default function RootLayout({ children }) {
+      return (
+        <html lang="en" className={inter.className}>
+          <body>{children}</body>
+        </html>
+      )
+    }
+    ```
+  </Tab>
+  <Tab title="Local font">
+    ```jsx app/layout.js
+    import localFont from 'next/font/local'
+
+    const myFont = localFont({
+      src: './my-font.woff2',
+      display: 'swap',
+    })
+
+    export default function RootLayout({ children }) {
+      return (
+        <html lang="en" className={myFont.className}>
+          <body>{children}</body>
+        </html>
+      )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Options
+
+<ParamField path="src" type="string | object[]">
+  The path to the font file, relative to where the font loader is called. Used in `next/font/local` only.
+
+  - String: `'./fonts/my-font.woff2'`
+  - Array of objects for multiple weights/styles:
+    ```js
+    src: [
+      { path: './Roboto-Regular.woff2', weight: '400', style: 'normal' },
+      { path: './Roboto-Bold.woff2', weight: '700', style: 'normal' },
+    ]
+    ```
+
+  **Required** for `next/font/local`.
+</ParamField>
+
+<ParamField path="weight" type="string | string[]">
+  The font weight. Can be:
+  - A single value: `'400'`
+  - A range for variable fonts: `'100 900'`
+  - An array for non-variable fonts: `['400', '700']`
+
+  **Required** for non-variable fonts.
+</ParamField>
+
+<ParamField path="style" type="string | string[]">
+  The font style. Defaults to `'normal'`. Accepts:
+  - A string: `'italic'` or `'normal'`
+  - An array for multiple styles (Google fonts only): `['italic', 'normal']`
+</ParamField>
+
+<ParamField path="subsets" type="string[]">
+  Subsets to preload, defined as an array of string names. Used in `next/font/google` only.
+
+  ```js
+  subsets: ['latin']
+  ```
+
+  When `preload` is `true` (the default), a `<link rel="preload">` tag is injected for each specified subset.
+</ParamField>
+
+<ParamField path="axes" type="string[]">
+  Additional variable font axes to include. Only the weight axis is included by default to minimize file size. Available values depend on the specific font.
+
+  ```js
+  axes: ['slnt'] // for Inter variable font
+  ```
+
+  Used in `next/font/google` only.
+</ParamField>
+
+<ParamField path="display" type="string" default="swap">
+  The CSS `font-display` value. Accepts `'auto'`, `'block'`, `'swap'`, `'fallback'`, or `'optional'`.
+</ParamField>
+
+<ParamField path="preload" type="boolean" default="true">
+  Whether to preload the font. When `true`, a `<link rel="preload">` tag is injected.
+
+  Preloading scope depends on where the font is used:
+  - In a page file — preloaded for that route only
+  - In a layout file — preloaded for all routes wrapped by that layout
+  - In the root layout — preloaded for all routes
+</ParamField>
+
+<ParamField path="fallback" type="string[]">
+  Fallback fonts to use if the primary font cannot be loaded.
+
+  ```js
+  fallback: ['system-ui', 'arial']
+  ```
+</ParamField>
+
+<ParamField path="adjustFontFallback" type="boolean | string" default="true">
+  Automatically adjusts the fallback font to reduce Cumulative Layout Shift (CLS).
+
+  - For `next/font/google`: a boolean (default `true`)
+  - For `next/font/local`: `'Arial'` (default), `'Times New Roman'`, or `false`
+</ParamField>
+
+<ParamField path="variable" type="string">
+  The CSS custom property name for use with the CSS variable method.
+
+  ```js
+  variable: '--font-inter'
+  ```
+
+  Exposes the font as `var(--font-inter)` in CSS.
+</ParamField>
+
+<ParamField path="declarations" type="object[]">
+  Additional `@font-face` descriptor key-value pairs. Used in `next/font/local` only.
+
+  ```js
+  declarations: [{ prop: 'ascent-override', value: '90%' }]
+  ```
+</ParamField>
+
+## Applying fonts
+
+The font loader returns an object with three ways to apply the font:
+
+<AccordionGroup>
+  <Accordion title="className">
+    A read-only CSS class that applies the font family and fallback.
+
+    ```jsx
+    <p className={inter.className}>Hello, Next.js!</p>
+    ```
+  </Accordion>
+  <Accordion title="style">
+    A read-only CSS style object with `fontFamily` set.
+
+    ```jsx
+    <p style={inter.style}>Hello World</p>
+    ```
+  </Accordion>
+  <Accordion title="CSS variables">
+    Use `variable` to expose the font as a CSS custom property, then reference it in external stylesheets.
+
+    ```jsx app/page.js
+    import { Inter } from 'next/font/google'
+    import styles from './component.module.css'
+
+    const inter = Inter({ variable: '--font-inter' })
+
+    export default function Page() {
+      return (
+        <main className={inter.variable}>
+          <p className={styles.text}>Hello World</p>
+        </main>
+      )
+    }
+    ```
+
+    ```css styles/component.module.css
+    .text {
+      font-family: var(--font-inter);
+      font-weight: 200;
+      font-style: italic;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Examples
+
+### Google Fonts
+
+Import variable fonts by name. No weight is needed for variable fonts.
+
+```jsx app/layout.js
+import { Inter } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+For non-variable fonts, specify a weight:
+
+```jsx app/layout.js
+import { Roboto } from 'next/font/google'
+
+const roboto = Roboto({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+})
+```
+
+Multiple weights and styles:
+
+```jsx
+const roboto = Roboto({
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  subsets: ['latin'],
+  display: 'swap',
+})
+```
+
+<Tip>Use an underscore for font names with multiple words. Example: `Roboto Mono` → import as `Roboto_Mono`.</Tip>
+
+### Local fonts
+
+```jsx app/layout.js
+import localFont from 'next/font/local'
+
+const myFont = localFont({
+  src: './my-font.woff2',
+  display: 'swap',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={myFont.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+For a font family with multiple files:
+
+```js
+const roboto = localFont({
+  src: [
+    { path: './Roboto-Regular.woff2', weight: '400', style: 'normal' },
+    { path: './Roboto-Italic.woff2', weight: '400', style: 'italic' },
+    { path: './Roboto-Bold.woff2', weight: '700', style: 'normal' },
+    { path: './Roboto-BoldItalic.woff2', weight: '700', style: 'italic' },
+  ],
+})
+```
+
+### Multiple fonts
+
+Create a shared font definitions file to avoid duplicate instances:
+
+```ts app/fonts.ts
+import { Inter, Roboto_Mono } from 'next/font/google'
+
+export const inter = Inter({ subsets: ['latin'], display: 'swap' })
+export const roboto_mono = Roboto_Mono({ subsets: ['latin'], display: 'swap' })
+```
+
+```jsx app/layout.js
+import { inter } from './fonts'
+
+export default function Layout({ children }) {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### Tailwind CSS
+
+Use the `variable` option to expose fonts as CSS custom properties, then reference them in your Tailwind config.
+
+```jsx app/layout.js
+import { Inter, Roboto_Mono } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
+const roboto_mono = Roboto_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-roboto-mono' })
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={`${inter.variable} ${roboto_mono.variable} antialiased`}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```css global.css
+@import 'tailwindcss';
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-roboto-mono);
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.2.0` | `@next/font` renamed to `next/font` |
+| `v13.0.0` | `@next/font` introduced |

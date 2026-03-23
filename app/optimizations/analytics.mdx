@@ -1,0 +1,214 @@
+---
+title: Analytics
+description: Measure and report Web Vitals performance metrics from your Next.js application.
+---
+
+Next.js has built-in support for measuring and reporting [Core Web Vitals](https://web.dev/vitals/)—the metrics used by Google to evaluate real-world page performance.
+
+## Web Vitals
+
+The following metrics are reported:
+
+| Metric | Description |
+|---|---|
+| [TTFB](https://web.dev/ttfb/) | Time to First Byte |
+| [FCP](https://web.dev/fcp/) | First Contentful Paint |
+| [LCP](https://web.dev/lcp/) | Largest Contentful Paint |
+| [FID](https://web.dev/fid/) | First Input Delay |
+| [CLS](https://web.dev/cls/) | Cumulative Layout Shift |
+| [INP](https://web.dev/inp/) | Interaction to Next Paint |
+
+## `useReportWebVitals`
+
+The `useReportWebVitals` hook is called every time a metric value is available in the browser:
+
+```tsx app/components/WebVitals.tsx
+'use client'
+
+import { useReportWebVitals } from 'next/web-vitals'
+
+export function WebVitals() {
+  useReportWebVitals((metric) => {
+    console.log(metric)
+  })
+
+  return null
+}
+```
+
+Render the component in your root layout:
+
+<CodeGroup>
+
+```tsx app/layout.tsx
+import { WebVitals } from './components/WebVitals'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <WebVitals />
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import { WebVitals } from './components/WebVitals'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <WebVitals />
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+<Note>
+Because `useReportWebVitals` requires the `'use client'` directive, create a separate component for it rather than adding it directly to the root layout (which is a Server Component).
+</Note>
+
+## The metric object
+
+The `metric` argument passed to the callback has the following shape:
+
+<ResponseField name="id" type="string">
+  A unique identifier for the metric in the context of the current page load.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The metric name. One of `'TTFB'`, `'FCP'`, `'LCP'`, `'FID'`, `'CLS'`, `'INP'`.
+</ResponseField>
+
+<ResponseField name="value" type="number">
+  The metric value. For time-based metrics, the unit is milliseconds. For CLS, it is a unitless score.
+</ResponseField>
+
+<ResponseField name="delta" type="number">
+  The delta between the current value and the last reported value. Useful for calculating the total value when sending to analytics.
+</ResponseField>
+
+<ResponseField name="rating" type="string">
+  The qualitative rating of the metric. One of `'good'`, `'needs-improvement'`, or `'poor'`.
+</ResponseField>
+
+<ResponseField name="navigationType" type="string">
+  How the page was loaded. One of `'navigate'`, `'reload'`, `'back-forward'`, `'back-forward-cache'`, `'prerender'`.
+</ResponseField>
+
+## Sending metrics to an analytics service
+
+Send metrics to any analytics service inside the `useReportWebVitals` callback. The following examples show common integrations:
+
+<Tabs>
+  <Tab title="Generic (fetch)">
+    ```tsx app/components/WebVitals.tsx
+    'use client'
+
+    import { useReportWebVitals } from 'next/web-vitals'
+
+    export function WebVitals() {
+      useReportWebVitals((metric) => {
+        const body = JSON.stringify(metric)
+        const url = '/api/analytics'
+
+        // Use `navigator.sendBeacon()` if available, falling back to `fetch`
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url, body)
+        } else {
+          fetch(url, { body, method: 'POST', keepalive: true })
+        }
+      })
+
+      return null
+    }
+    ```
+  </Tab>
+
+  <Tab title="Google Analytics">
+    ```tsx app/components/WebVitals.tsx
+    'use client'
+
+    import { useReportWebVitals } from 'next/web-vitals'
+
+    export function WebVitals() {
+      useReportWebVitals((metric) => {
+        window.gtag('event', metric.name, {
+          value: Math.round(
+            metric.name === 'CLS' ? metric.value * 1000 : metric.value
+          ),
+          event_label: metric.id,
+          non_interaction: true,
+        })
+      })
+
+      return null
+    }
+    ```
+  </Tab>
+
+  <Tab title="Datadog">
+    ```tsx app/components/WebVitals.tsx
+    'use client'
+
+    import { useReportWebVitals } from 'next/web-vitals'
+
+    export function WebVitals() {
+      useReportWebVitals((metric) => {
+        // Forward to Datadog RUM
+        window.DD_RUM?.onReady(() => {
+          window.DD_RUM.addTiming(metric.name, metric.value)
+        })
+      })
+
+      return null
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Vercel Speed Insights
+
+Vercel provides [Speed Insights](https://vercel.com/docs/speed-insights) as a built-in analytics product for applications deployed on Vercel. No additional code is required—Speed Insights is enabled automatically in the Vercel dashboard.
+
+For self-hosted deployments or to collect metrics manually, use the `useReportWebVitals` hook as shown above.
+
+## Performance budget
+
+Use the `rating` field to alert when metrics fall outside acceptable ranges:
+
+```tsx app/components/WebVitals.tsx
+'use client'
+
+import { useReportWebVitals } from 'next/web-vitals'
+
+export function WebVitals() {
+  useReportWebVitals((metric) => {
+    if (metric.rating === 'poor') {
+      console.warn(
+        `Poor ${metric.name} score: ${metric.value} (${metric.rating})`
+      )
+    }
+
+    // Send to monitoring service
+    if (metric.name === 'LCP' && metric.value > 2500) {
+      // LCP > 2.5s is considered poor
+      reportToMonitoring('lcp_poor', metric)
+    }
+  })
+
+  return null
+}
+```

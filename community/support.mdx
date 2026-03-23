@@ -1,0 +1,89 @@
+---
+title: Getting support
+description: Where to ask questions, report bugs, and get help with Next.js.
+---
+
+With over 5 million weekly downloads, Next.js has a large and active community. Here are the best places to get help.
+
+## Community channels
+
+<CardGroup cols={2}>
+  <Card title="GitHub Discussions" icon="message-square" href="https://github.com/vercel/next.js/discussions">
+    Ask questions, share ideas, and discuss Next.js topics with the community and the core team.
+  </Card>
+  <Card title="Discord" icon="message-circle" href="https://discord.com/invite/bUG2bvbtHy">
+    Real-time chat with other Next.js developers. Channels for help, showcasing projects, and announcements.
+  </Card>
+  <Card title="Reddit" icon="hash" href="https://www.reddit.com/r/nextjs">
+    The r/nextjs subreddit for questions, news, and discussion.
+  </Card>
+  <Card title="Stack Overflow" icon="help-circle" href="https://stackoverflow.com/questions/tagged/next.js">
+    Searchable Q&A. Tag your questions with `next.js` to reach developers with Next.js expertise.
+  </Card>
+</CardGroup>
+
+## Reporting bugs
+
+If you think you've found a bug in Next.js, open an issue on GitHub:
+
+<Steps>
+  <Step title="Search existing issues">
+    Check [open](https://github.com/vercel/next.js/issues) and [closed](https://github.com/vercel/next.js/issues?q=is%3Aissue+is%3Aclosed) issues first. Your bug may already be tracked or fixed on `canary`.
+  </Step>
+  <Step title="Reproduce the bug">
+    Create a minimal reproduction. The easiest way is to use the official templates:
+
+    ```bash
+    npx create-next-app@latest repro-app
+    ```
+
+    Strip the app down to the smallest code that shows the problem.
+  </Step>
+  <Step title="Open an issue">
+    File a [bug report](https://github.com/vercel/next.js/issues/new?template=1.bug_report.yml) with:
+    - Next.js version (`next --version`)
+    - Node.js version (`node --version`)
+    - Operating system
+    - A link to your minimal reproduction
+    - Steps to reproduce and expected vs. actual behavior
+  </Step>
+</Steps>
+
+<Warning>
+  Do not include secrets, API keys, or tokens in issue reproductions or comments.
+</Warning>
+
+## Reporting security vulnerabilities
+
+Do **not** open a public GitHub issue for security vulnerabilities. Instead, follow the responsible disclosure process:
+
+1. Go to the [Security tab](https://github.com/vercel/next.js/security/advisories/new) on the Next.js repository.
+2. Click **Report a vulnerability** to open a private advisory.
+3. Provide a clear description, steps to reproduce, and potential impact.
+
+The Next.js security team will respond as quickly as possible and coordinate a fix and disclosure timeline with you.
+
+## Staying up to date
+
+<CardGroup cols={2}>
+  <Card title="Twitter / X" icon="twitter" href="https://x.com/nextjs">
+    Follow @nextjs for release announcements and community highlights.
+  </Card>
+  <Card title="YouTube" icon="youtube" href="https://www.youtube.com/@VercelHQ">
+    The Vercel YouTube channel publishes conference talks, tutorials, and deep dives.
+  </Card>
+  <Card title="Canary releases" icon="package">
+    Try features before they are stable by installing the canary version:
+
+    ```bash
+    npm install next@canary
+    ```
+  </Card>
+  <Card title="Release notes" icon="file-text" href="https://github.com/vercel/next.js/releases">
+    Full changelog for every Next.js release on GitHub.
+  </Card>
+</CardGroup>
+
+## Code of conduct
+
+All community spaces are governed by the [Next.js Code of Conduct](https://github.com/vercel/next.js/blob/canary/CODE_OF_CONDUCT.md). We are committed to a welcoming and respectful environment for everyone.

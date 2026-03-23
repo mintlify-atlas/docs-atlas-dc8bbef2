@@ -1,0 +1,249 @@
+---
+title: Configuring
+description: Configure next.config.js for Pages Router projects, including environment variables, TypeScript, ESLint, absolute imports, and custom headers.
+---
+
+Next.js is configured through a `next.config.js` (or `next.config.ts`) file at the root of your project.
+
+## `next.config.js` basics
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+}
+
+module.exports = nextConfig
+```
+
+Use JSDoc to get TypeScript type checking in a `.js` file, or use `next.config.ts` for full TypeScript support:
+
+```ts next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+}
+
+export default nextConfig
+```
+
+## Environment variables
+
+### Built-in `.env` support
+
+Next.js loads environment variables from `.env` files automatically:
+
+| File | Scope |
+| --- | --- |
+| `.env` | All environments |
+| `.env.local` | Local overrides (gitignored) |
+| `.env.development` | `next dev` only |
+| `.env.production` | `next build` / `next start` only |
+| `.env.test` | Test environment only |
+
+```bash .env.local
+DATABASE_URL=postgresql://localhost:5432/mydb
+ANALYTICS_KEY=my-secret-key
+```
+
+Access them in server-side code:
+
+```ts pages/api/data.ts
+export default function handler(req, res) {
+  const db = process.env.DATABASE_URL
+  // ...
+}
+```
+
+### Exposing variables to the browser
+
+Variables prefixed with `NEXT_PUBLIC_` are included in the client-side bundle:
+
+```bash .env.local
+NEXT_PUBLIC_API_URL=https://api.example.com
+```
+
+```tsx pages/index.tsx
+export default function Home() {
+  return <p>API: {process.env.NEXT_PUBLIC_API_URL}</p>
+}
+```
+
+<Warning>
+Never prefix secret values (API keys, database passwords) with `NEXT_PUBLIC_`. They will be visible in the browser.
+</Warning>
+
+### Runtime environment variables
+
+For values that differ between deployments (not build time), access them in `getServerSideProps` or API routes at runtime:
+
+```ts
+export async function getServerSideProps() {
+  const apiUrl = process.env.API_URL
+  const data = await fetch(apiUrl).then((r) => r.json())
+  return { props: { data } }
+}
+```
+
+## TypeScript
+
+Next.js has zero-configuration TypeScript support. Create or leave a `tsconfig.json` at the root and run `next dev`—Next.js configures it automatically.
+
+### Strict mode
+
+Enable strict type checking:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true
+  }
+}
+```
+
+### Pages Router TypeScript types
+
+Key types from the `next` package:
+
+```tsx
+import type {
+  GetStaticProps,
+  GetStaticPaths,
+  GetServerSideProps,
+  InferGetStaticPropsType,
+  InferGetServerSidePropsType,
+  NextPage,
+  AppProps,
+} from 'next'
+import type { NextApiRequest, NextApiResponse } from 'next'
+```
+
+## ESLint
+
+Next.js includes a built-in ESLint configuration. Run it with:
+
+```bash
+npm run lint
+```
+
+`create-next-app` sets this up automatically. For manual setup:
+
+```bash
+npm install --save-dev eslint eslint-config-next
+```
+
+```json .eslintrc.json
+{
+  "extends": "next/core-web-vitals"
+}
+```
+
+The `next/core-web-vitals` preset is stricter than `next` and enables rules that affect Core Web Vitals.
+
+## Absolute imports
+
+Configure the `baseUrl` in `tsconfig.json` (or `jsconfig.json` for JavaScript projects) to use absolute imports:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": "."
+  }
+}
+```
+
+Now you can import from the project root instead of using relative paths:
+
+```tsx
+// Before
+import Button from '../../../components/Button'
+
+// After
+import Button from 'components/Button'
+```
+
+### Module aliases
+
+For custom path aliases:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/components/*": ["components/*"],
+      "@/lib/*": ["lib/*"]
+    }
+  }
+}
+```
+
+```tsx
+import Button from '@/components/Button'
+import { db } from '@/lib/db'
+```
+
+## Headers, redirects, and rewrites
+
+Configure HTTP headers, redirects, and URL rewrites in `next.config.js`:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+        ],
+      },
+    ]
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/old-blog/:slug',
+        destination: '/blog/:slug',
+        permanent: true,
+      },
+    ]
+  },
+
+  async rewrites() {
+    return [
+      {
+        source: '/api/proxy/:path*',
+        destination: 'https://api.example.com/:path*',
+      },
+    ]
+  },
+}
+
+module.exports = nextConfig
+```
+
+## Customizing the build directory
+
+The default build output directory is `.next`. You can change it:
+
+```js next.config.js
+module.exports = {
+  distDir: 'build',
+}
+```
+
+## Page extensions
+
+By default, Next.js looks for `.js`, `.jsx`, `.ts`, and `.tsx` files in `pages/`. You can customize this:
+
+```js next.config.js
+module.exports = {
+  pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
+}
+```
+
+With this config, `pages/index.page.tsx` maps to `/` and plain `.tsx` files in `pages/` are ignored (useful for co-locating tests with pages).

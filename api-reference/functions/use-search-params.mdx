@@ -1,0 +1,176 @@
+---
+title: useSearchParams
+description: API reference for the useSearchParams hook, used to read the current URL query string in Client Components.
+---
+
+`useSearchParams` is a **Client Component** hook that returns a read-only version of the [`URLSearchParams`](https://developer.mozilla.org/docs/Web/API/URLSearchParams) interface for the current URL query string.
+
+```typescript app/dashboard/search-bar.tsx
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SearchBar() {
+  const searchParams = useSearchParams()
+  const search = searchParams.get('search')
+
+  // URL -> /dashboard?search=my-project
+  // search -> 'my-project'
+  return <>Search: {search}</>
+}
+```
+
+## Parameters
+
+`useSearchParams` takes no parameters.
+
+## Returns
+
+A **read-only** [`URLSearchParams`](https://developer.mozilla.org/docs/Web/API/URLSearchParams) instance.
+
+<ResponseField name="get(name)" type="string | null">
+  Returns the first value of the named parameter.
+
+  | URL | `searchParams.get('a')` |
+  | --- | --- |
+  | `/dashboard?a=1` | `'1'` |
+  | `/dashboard?a=` | `''` |
+  | `/dashboard?b=3` | `null` |
+  | `/dashboard?a=1&a=2` | `'1'` |
+</ResponseField>
+
+<ResponseField name="getAll(name)" type="string[]">
+  Returns all values for the named parameter.
+</ResponseField>
+
+<ResponseField name="has(name)" type="boolean">
+  Returns `true` if the parameter exists.
+
+  | URL | `searchParams.has('a')` |
+  | --- | --- |
+  | `/dashboard?a=1` | `true` |
+  | `/dashboard?b=3` | `false` |
+</ResponseField>
+
+<ResponseField name="keys()" type="IterableIterator<string>">
+  Returns an iterator of all parameter names.
+</ResponseField>
+
+<ResponseField name="values()" type="IterableIterator<string>">
+  Returns an iterator of all parameter values.
+</ResponseField>
+
+<ResponseField name="entries()" type="IterableIterator<[string, string]>">
+  Returns an iterator of all `[name, value]` pairs.
+</ResponseField>
+
+<ResponseField name="toString()" type="string">
+  Returns the query string as a string (without the leading `?`).
+</ResponseField>
+
+## Good to know
+
+- `useSearchParams` is a Client Component hook and is **not supported** in Server Components, to prevent stale values during partial rendering.
+- In Server Component pages, read the [`searchParams` prop](/api-reference/file-conventions/page#searchparams-optional) instead.
+- Layouts do **not** receive `searchParams` because they are not re-rendered on navigation.
+- If your app has a `/pages` directory, `useSearchParams` may return `null` on initial render for pages that don't use `getServerSideProps`.
+
+## Behavior
+
+### Prerendering and Suspense
+
+If a route is prerendered, calling `useSearchParams` causes the Client Component tree up to the closest [`Suspense` boundary](https://react.dev/reference/react/Suspense) to be client-side rendered. Wrap the component in `<Suspense>` to allow the rest of the page to prerender normally:
+
+```typescript app/dashboard/page.tsx
+import { Suspense } from 'react'
+import SearchBar from './search-bar'
+
+function SearchBarFallback() {
+  return <>Loading...</>
+}
+
+export default function Page() {
+  return (
+    <>
+      <nav>
+        <Suspense fallback={<SearchBarFallback />}>
+          <SearchBar />
+        </Suspense>
+      </nav>
+      <h1>Dashboard</h1>
+    </>
+  )
+}
+```
+
+<Warning>
+  During a production build, a static page that calls `useSearchParams` from a Client Component must be wrapped in a `Suspense` boundary, or the build will fail with a [Missing Suspense boundary](https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout) error.
+</Warning>
+
+### Dynamic rendering
+
+If the route is dynamically rendered (e.g. via the [`connection`](/api-reference/functions/headers) function), `useSearchParams` is available on the server during the initial render:
+
+```typescript app/dashboard/page.tsx
+import { connection } from 'next/server'
+import SearchBar from './search-bar'
+
+export default async function Page() {
+  await connection()
+  return (
+    <nav>
+      <SearchBar />
+    </nav>
+  )
+}
+```
+
+## Examples
+
+### Updating search params
+
+Use `useRouter` or `<Link>` to set new search params:
+
+```typescript app/example-client-component.tsx
+'use client'
+
+import { useCallback } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+
+export default function SortControls() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const createQueryString = useCallback(
+    (name: string, value: string) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set(name, value)
+      return params.toString()
+    },
+    [searchParams]
+  )
+
+  return (
+    <>
+      <button
+        onClick={() =>
+          router.push(pathname + '?' + createQueryString('sort', 'asc'))
+        }
+      >
+        Sort ASC
+      </button>
+      <Link href={pathname + '?' + createQueryString('sort', 'desc')}>
+        Sort DESC
+      </Link>
+    </>
+  )
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.0.0` | `useSearchParams` introduced. |

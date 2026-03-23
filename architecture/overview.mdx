@@ -1,0 +1,168 @@
+---
+title: Architecture overview
+description: A high-level look at how Next.js is structured — the compilation pipeline, rendering strategies, key packages, and how client and server tie together.
+---
+
+Next.js is a full-stack React framework built as a monorepo. Understanding its architecture helps you make better decisions about performance, bundling, and rendering.
+
+## Key packages
+
+<CardGroup cols={2}>
+  <Card title="next" icon="box">
+    The main framework package published to npm. Contains the dev server, build pipeline, routing, and all runtime code for client and server.
+  </Card>
+  <Card title="create-next-app" icon="terminal">
+    The project scaffolding CLI. Bootstraps a new Next.js application with sensible defaults and optional templates.
+  </Card>
+  <Card title="@next/swc" icon="bolt">
+    Native Rust bindings for the SWC compiler. Handles TypeScript and JSX transpilation, minification, and code transforms — replacing Babel.
+  </Card>
+  <Card title="Turbopack" icon="zap">
+    A Rust-based incremental bundler integrated into `next dev` and `next build`. Uses demand-driven evaluation and persistent caching for fast rebuild times.
+  </Card>
+</CardGroup>
+
+## Repository structure
+
+The Next.js repository is a pnpm monorepo:
+
+```text
+next.js/
+├── packages/next/          # Main framework (published as "next" on npm)
+│   └── src/
+│       ├── build/          # Build pipeline (webpack, Turbopack, SWC)
+│       ├── client/         # Client-side runtime
+│       ├── server/         # Server runtime
+│       └── cli/            # next dev, next build, next start entry points
+├── packages/create-next-app/  # Project scaffolding CLI
+├── packages/next-swc/      # Rust/SWC native bindings
+├── packages/eslint-plugin-next/  # ESLint rules
+├── turbopack/              # Turbopack bundler (Rust, managed as a git subtree)
+├── crates/                 # Additional Rust crates for SWC transforms
+├── test/                   # All test suites (e2e, development, production, unit)
+└── examples/               # Example applications
+```
+
+## Compilation pipeline
+
+When you run `next build`, Next.js orchestrates several compilation stages:
+
+<Steps>
+  <Step title="Configuration loading">
+    Next.js reads `next.config.js` (or `next.config.ts`), resolves `jsconfig.json` / `tsconfig.json`, and constructs the full build configuration including compiler options, environment variables, and feature flags.
+  </Step>
+  <Step title="Entry point discovery">
+    The framework walks your `app/` or `pages/` directory to collect all routes, layouts, and special files (`loading.tsx`, `error.tsx`, `not-found.tsx`). These become Webpack or Turbopack entry points.
+  </Step>
+  <Step title="Bundling">
+    Turbopack (default) or Webpack compiles and bundles each entry point. The SWC compiler handles TypeScript and JSX transforms. Tree-shaking, code splitting, and chunk optimization happen here.
+  </Step>
+  <Step title="Rendering">
+    Static pages are pre-rendered at build time. Server components are analyzed to separate server-only code from client bundles. Dynamic routes emit server functions instead of static HTML.
+  </Step>
+  <Step title="Output">
+    Compiled assets, server functions, static HTML, route manifests, and source maps are written to the `.next/` directory, ready to be served by `next start` or deployed.
+  </Step>
+</Steps>
+
+## Rendering strategies
+
+Next.js supports multiple rendering strategies that can be mixed within a single application:
+
+<Tabs>
+  <Tab title="Static (SSG)">
+    Pages are rendered at build time and served as static HTML. No server required at request time. Ideal for content that doesn't change per user.
+
+    ```tsx filename="app/blog/[slug]/page.tsx"
+    export async function generateStaticParams() {
+      const posts = await getPosts()
+      return posts.map((post) => ({ slug: post.slug }))
+    }
+
+    export default async function Page({ params }: { params: { slug: string } }) {
+      const post = await getPost(params.slug)
+      return <article>{post.content}</article>
+    }
+    ```
+  </Tab>
+  <Tab title="Server (SSR)">
+    Pages are rendered on the server on every request. Useful for personalized content or data that must be fresh on every load.
+
+    ```tsx filename="app/dashboard/page.tsx"
+    export const dynamic = 'force-dynamic'
+
+    export default async function Page() {
+      const data = await fetch('https://api.example.com/data', {
+        cache: 'no-store',
+      })
+      return <Dashboard data={await data.json()} />
+    }
+    ```
+  </Tab>
+  <Tab title="Client (CSR)">
+    Components marked with `'use client'` render in the browser. They can use React hooks, browser APIs, and event listeners.
+
+    ```tsx filename="app/components/counter.tsx"
+    'use client'
+
+    import { useState } from 'react'
+
+    export function Counter() {
+      const [count, setCount] = useState(0)
+      return <button onClick={() => setCount(count + 1)}>{count}</button>
+    }
+    ```
+  </Tab>
+  <Tab title="Streaming">
+    The server streams HTML to the browser progressively. Suspense boundaries mark parts of the UI that can be deferred, so users see content faster.
+
+    ```tsx filename="app/page.tsx"
+    import { Suspense } from 'react'
+    import { SlowComponent } from './slow-component'
+
+    export default function Page() {
+      return (
+        <>
+          <h1>Welcome</h1>
+          <Suspense fallback={<p>Loading...</p>}>
+            <SlowComponent />
+          </Suspense>
+        </>
+      )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Client and server boundary
+
+Next.js uses the React Server Components model to split your application into two execution environments:
+
+- **Server components** run only on the server (or at build time). They can access databases, file systems, and secrets directly. They never ship JavaScript to the browser.
+- **Client components** are prefixed with `'use client'`. They hydrate in the browser and can use stateful hooks and browser APIs.
+
+The boundary is determined at the component level. Server components can import client components, but client components cannot directly import server components — they can only receive them as props or children.
+
+```text
+Request
+  └── Server component (fetches data, renders HTML)
+        ├── Another server component (no JS sent to browser)
+        └── 'use client' boundary
+              └── Client component (hydrated in browser)
+```
+
+## Build output
+
+After a successful build, the `.next/` directory contains:
+
+| Path | Contents |
+|---|---|
+| `.next/server/` | Server-side bundles and HTML for pre-rendered pages |
+| `.next/static/` | Hashed client-side JS chunks, CSS, and media |
+| `.next/cache/` | Incremental build cache (Turbopack persistent cache) |
+| `.next/BUILD_ID` | Unique identifier for the current build |
+| `.next/routes-manifest.json` | Route metadata used by the server at runtime |
+
+<Note>
+  The development branch is `canary`. All pull requests should be opened against `canary`, not `main`.
+</Note>

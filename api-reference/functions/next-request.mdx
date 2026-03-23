@@ -1,0 +1,129 @@
+---
+title: NextRequest
+description: API reference for the NextRequest class, which extends the Web Request API with additional helpers for Next.js middleware and Route Handlers.
+---
+
+`NextRequest` extends the native [Web `Request` API](https://developer.mozilla.org/docs/Web/API/Request) with additional convenience methods for use in [Middleware](/api-reference/file-conventions/route) and [Route Handlers](/api-reference/file-conventions/route).
+
+```typescript middleware.ts
+import { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get('auth-token')
+  // ...
+}
+```
+
+## `cookies`
+
+Read or mutate the cookies on the incoming request.
+
+<ResponseField name="get(name)" type="{ name: string; value: string } | undefined">
+  Returns the first cookie with the given name, or `undefined` if not found.
+
+  ```typescript
+  // { name: 'show-banner', value: 'false', Path: '/home' }
+  request.cookies.get('show-banner')
+  ```
+</ResponseField>
+
+<ResponseField name="getAll(name?)" type="{ name: string; value: string }[]">
+  Returns all cookies with the given name, or all cookies if no name is provided.
+
+  ```typescript
+  request.cookies.getAll('experiments')
+  request.cookies.getAll() // all cookies
+  ```
+</ResponseField>
+
+<ResponseField name="set(name, value)" type="void">
+  Sets a cookie on the request.
+
+  ```typescript
+  request.cookies.set('show-banner', 'false')
+  ```
+</ResponseField>
+
+<ResponseField name="delete(name)" type="boolean">
+  Deletes the cookie with the given name. Returns `true` if deleted, `false` otherwise.
+
+  ```typescript
+  request.cookies.delete('experiments')
+  ```
+</ResponseField>
+
+<ResponseField name="has(name)" type="boolean">
+  Returns `true` if the cookie exists.
+
+  ```typescript
+  request.cookies.has('experiments')
+  ```
+</ResponseField>
+
+<ResponseField name="clear()" type="void">
+  Removes all cookies from the request.
+
+  ```typescript
+  request.cookies.clear()
+  ```
+</ResponseField>
+
+## `nextUrl`
+
+Extends the native [`URL` API](https://developer.mozilla.org/docs/Web/API/URL) with Next.js-specific properties.
+
+```typescript
+// Given a request to /home
+request.nextUrl.pathname     // '/home'
+
+// Given a request to /home?name=lee
+request.nextUrl.searchParams // URLSearchParams { 'name' => 'lee' }
+```
+
+### Available properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `basePath` | `string` | The [base path](/api-reference/config/next-config-js) of the URL. |
+| `buildId` | `string \| undefined` | The build identifier of the Next.js app. Can be [customized](/api-reference/config/next-config-js). |
+| `pathname` | `string` | The URL pathname. |
+| `searchParams` | `URLSearchParams` | The URL search parameters. |
+
+<Note>
+  The internationalization properties available in the Pages Router (`locale`, `locales`, `defaultLocale`, `domainLocale`) are not available in the App Router. Use the [App Router internationalization guide](/app/guides/internationalization) instead.
+</Note>
+
+## Inherited from `Request`
+
+`NextRequest` inherits all properties and methods from the native [`Request`](https://developer.mozilla.org/docs/Web/API/Request) API, including:
+
+- `method` — HTTP method (e.g. `'GET'`, `'POST'`)
+- `url` — The full request URL as a string
+- `headers` — A read-only [`Headers`](https://developer.mozilla.org/docs/Web/API/Headers) object
+- `body` — The request body as a `ReadableStream`
+- `json()`, `text()`, `arrayBuffer()`, `formData()` — Body parsing methods
+
+## Example
+
+```typescript middleware.ts
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const country = request.headers.get('x-country')
+  const isLoggedIn = request.cookies.has('session')
+
+  if (!isLoggedIn && request.nextUrl.pathname.startsWith('/dashboard')) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('from', request.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  return NextResponse.next()
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.0.0` | `ip` and `geo` properties removed. |

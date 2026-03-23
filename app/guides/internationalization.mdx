@@ -1,0 +1,173 @@
+---
+title: Internationalization
+description: Add support for multiple languages with i18n routing, locale detection, and server-side message translation in the Next.js App Router.
+---
+
+Next.js lets you configure routing and rendering to support multiple languages. This covers:
+
+- **Internationalized routing** — Routing based on locale (sub-path or domain)
+- **Localization** — Translating content based on the user's preferred locale
+
+## Terminology
+
+- **Locale** — An identifier for a set of language and formatting preferences:
+  - `en-US` — English as spoken in the United States
+  - `nl-NL` — Dutch as spoken in the Netherlands
+  - `nl` — Dutch, no specific region
+
+## Routing overview
+
+Detect the user's preferred locale using the `Accept-Language` request header and redirect to the appropriate locale path.
+
+### Detect and redirect
+
+Use libraries like `@formatjs/intl-localematcher` and `negotiator` to match the best locale:
+
+```bash
+npm install @formatjs/intl-localematcher negotiator
+```
+
+```js filename="middleware.js"
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+import { NextResponse } from 'next/server'
+
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+function getLocale(request) {
+  const headers = { 'accept-language': request.headers.get('accept-language') ?? '' }
+  const languages = new Negotiator({ headers }).languages()
+  return match(languages, locales, defaultLocale)
+}
+
+export function middleware(request) {
+  const { pathname } = request.nextUrl
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  // e.g. /products -> /en-US/products
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: ['/((?!_next).*)'],
+}
+```
+
+### Dynamic locale segment
+
+Nest all pages under `app/[lang]/` so the router passes the locale to every layout and page:
+
+```tsx filename="app/[lang]/page.tsx"
+export default async function Page({ params }: PageProps<'/[lang]'>) {
+  const { lang } = await params
+  return <h1>Hello from {lang}</h1>
+}
+```
+
+The root layout can also use the locale:
+
+```tsx filename="app/[lang]/layout.tsx"
+export default async function RootLayout({ children, params }: LayoutProps<'/[lang]'>) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+## Localization
+
+Translate content using dictionary files. Maintain separate JSON files per locale:
+
+<CodeGroup>
+```json filename="dictionaries/en.json"
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json filename="dictionaries/nl.json"
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+</CodeGroup>
+
+Create a `getDictionary` function to load translations:
+
+```ts filename="app/[lang]/dictionaries.ts"
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  nl: () => import('./dictionaries/nl.json').then((module) => module.default),
+}
+
+export type Locale = keyof typeof dictionaries
+
+export const hasLocale = (locale: string): locale is Locale =>
+  locale in dictionaries
+
+export const getDictionary = async (locale: Locale) => dictionaries[locale]()
+```
+
+Fetch the dictionary in your page and render translated content:
+
+```tsx filename="app/[lang]/page.tsx"
+import { notFound } from 'next/navigation'
+import { getDictionary, hasLocale } from './dictionaries'
+
+export default async function Page({ params }: PageProps<'/[lang]'>) {
+  const { lang } = await params
+
+  if (!hasLocale(lang)) notFound()
+
+  const dict = await getDictionary(lang)
+  return <button>{dict.products.cart}</button>
+}
+```
+
+<Note>
+  Because all layouts and pages in `app/` default to Server Components, translation files do not increase the client-side JavaScript bundle size.
+</Note>
+
+## Static rendering
+
+Generate static routes for all locales using `generateStaticParams`:
+
+```tsx filename="app/[lang]/layout.tsx"
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+```
+
+## Libraries
+
+For more advanced use cases, these libraries provide additional features like pluralization, date/number formatting, and React hooks:
+
+<CardGroup cols={2}>
+  <Card title="next-intl" href="https://next-intl.dev">
+    Full-featured i18n with server and client support.
+  </Card>
+  <Card title="next-international" href="https://github.com/QuiiBz/next-international">
+    Type-safe i18n for App Router.
+  </Card>
+  <Card title="paraglide-next" href="https://inlang.com/m/osslbuzt/paraglide-next-i18n">
+    Compile-time i18n with zero runtime overhead.
+  </Card>
+  <Card title="lingui" href="https://lingui.dev">
+    Comprehensive i18n with message extraction.
+  </Card>
+</CardGroup>

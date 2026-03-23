@@ -1,0 +1,250 @@
+---
+title: Turbopack
+description: Configure Turbopack in Next.js — loaders, resolve aliases, module ID strategies, and more.
+---
+
+Turbopack is an incremental, Rust-based bundler built into Next.js. It is the **default bundler** starting in Next.js 16 and is used for both `next dev` and `next build`.
+
+<Note>
+To use Webpack instead of Turbopack, pass the `--webpack` flag to `next dev` or `next build`.
+</Note>
+
+## Supported platforms
+
+| Platform | Architectures |
+|---|---|
+| macOS | x64, ARM64 |
+| Windows | x64, ARM64 |
+| Linux (glibc) | x64, ARM64 |
+| Linux (musl) | x64, ARM64 |
+
+On platforms without native bindings (e.g. FreeBSD), Next.js falls back to WebAssembly bindings. WASM does not support Turbopack—use the `--webpack` flag on those platforms.
+
+## Enabling Turbopack
+
+Turbopack is enabled by default. No configuration is needed:
+
+```json package.json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build"
+  }
+}
+```
+
+To force Webpack:
+
+```json package.json
+{
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack"
+  }
+}
+```
+
+## Configuration
+
+Turbopack is configured under the `turbopack` key in `next.config.js`:
+
+```js next.config.js
+module.exports = {
+  turbopack: {
+    resolveAlias: {
+      underscore: 'lodash',
+    },
+    resolveExtensions: ['.mdx', '.tsx', '.ts', '.jsx', '.js', '.json'],
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+}
+```
+
+### Resolve aliases
+
+Map module names to different packages, similar to `resolve.alias` in webpack:
+
+<ParamField path="turbopack.resolveAlias" type="object">
+  A map of module name strings to their replacement module paths.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  turbopack: {
+    resolveAlias: {
+      // Replace 'underscore' with 'lodash'
+      underscore: 'lodash',
+      // Map to different packages per environment
+      mocha: { browser: 'mocha/browser-entry.js' },
+      // Map Sass tilde imports to node_modules
+      '~*': '*',
+    },
+  },
+}
+```
+
+### Resolve extensions
+
+Change or extend the file extensions Turbopack resolves:
+
+<ParamField path="turbopack.resolveExtensions" type="string[]">
+  Ordered list of file extensions to try when resolving imports without an extension.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  turbopack: {
+    resolveExtensions: ['.mdx', '.tsx', '.ts', '.jsx', '.js', '.json'],
+  },
+}
+```
+
+### Webpack loaders
+
+Turbopack supports a subset of webpack loader semantics for transforming files:
+
+<ParamField path="turbopack.rules" type="object">
+  A map of glob patterns to loader configurations.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  turbopack: {
+    rules: {
+      // Transform .svg files with @svgr/webpack
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+      // Transform .mdx with options
+      '*.mdx': {
+        loaders: [
+          {
+            loader: '@mdx-js/loader',
+            options: {
+              providerImportSource: '@mdx-js/react',
+            },
+          },
+        ],
+        as: '*.js',
+      },
+    },
+  },
+}
+```
+
+Each rule value accepts:
+
+<ParamField path="turbopack.rules[glob].loaders" type="string[] | object[]">
+  Loader paths or `{ loader, options }` objects to apply in order.
+</ParamField>
+
+<ParamField path="turbopack.rules[glob].as" type="string">
+  Rename the output file extension (e.g. `'*.js'` to treat loader output as JavaScript).
+</ParamField>
+
+### Root directory
+
+<ParamField path="turbopack.root" type="string">
+  The filesystem root used for module resolution. Defaults to the project directory. Set this when using symlinked packages outside the project root (e.g. `npm link`).
+</ParamField>
+
+```js next.config.js
+const path = require('path')
+
+module.exports = {
+  turbopack: {
+    root: path.join(__dirname, '..'),
+  },
+}
+```
+
+## Experimental options
+
+The following options are available under `experimental` in `next.config.js`:
+
+| Option | Description | Default (dev) | Default (build) |
+|---|---|---|---|
+| `turbopackFileSystemCacheForDev` | Enable filesystem cache for the dev server | `true` | N/A |
+| `turbopackFileSystemCacheForBuild` | Enable filesystem cache for builds | N/A | `false` |
+| `turbopackMinify` | Enable minification | `false` | `true` |
+| `turbopackSourceMaps` | Enable source maps | `true` | `productionBrowserSourceMaps` |
+| `turbopackInputSourceMaps` | Extract source maps from input files | `true` | `true` |
+| `turbopackTreeShaking` | Use advanced module-fragments tree shaking | `false` | `false` |
+| `turbopackRemoveUnusedImports` | Remove unused imports (requires `turbopackRemoveUnusedExports`) | `false` | `true` |
+| `turbopackRemoveUnusedExports` | Remove unused exports | `false` | `true` |
+| `turbopackModuleIds` | Module ID strategy: `'named'` or `'deterministic'` | `'named'` | `'deterministic'` |
+| `turbopackScopeHoisting` | Enable scope hoisting (always off in dev) | `false` | `true` |
+
+```js next.config.js
+module.exports = {
+  experimental: {
+    turbopackFileSystemCacheForBuild: true,
+    turbopackModuleIds: 'deterministic',
+  },
+}
+```
+
+## Known differences from webpack
+
+### Filesystem root
+
+Turbopack resolves modules relative to the project root. Files and symlinks outside the root are not resolved by default. Use `turbopack.root` to extend the resolution boundary.
+
+### CSS module ordering
+
+Turbopack orders CSS modules according to JavaScript import order. Webpack sometimes ignores this order for side-effect-free modules, which can cause subtle differences. To enforce CSS order, use `@import` in CSS modules:
+
+```css button.module.css
+@import './utils.module.css';
+```
+
+### Sass `~` imports
+
+Webpack supports tilde (`~`) prefixes for Sass `node_modules` imports. Turbopack does not. Replace:
+
+```scss
+/* Before */
+@import '~bootstrap/dist/css/bootstrap.min.css';
+
+/* After */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+```
+
+Or configure an alias:
+
+```js next.config.js
+module.exports = {
+  turbopack: {
+    resolveAlias: { '~*': '*' },
+  },
+}
+```
+
+### Webpack plugins
+
+Turbopack does not support webpack plugins. Webpack loaders are supported via the `turbopack.rules` configuration.
+
+## Performance tracing
+
+To generate a trace file for performance debugging:
+
+```bash
+NEXT_TURBOPACK_TRACING=1 next dev
+```
+
+This creates a `.next/dev/trace-turbopack` file. Include it when reporting issues on the Next.js GitHub repository.
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v16.0.0` | Turbopack becomes the default bundler; automatic Babel support |
+| `v15.5.0` | Turbopack `build` support in beta |
+| `v15.3.0` | Experimental `build` support |
+| `v15.0.0` | Turbopack `dev` stable |

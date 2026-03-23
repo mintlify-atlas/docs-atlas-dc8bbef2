@@ -1,0 +1,236 @@
+---
+title: Lazy loading
+description: Lazy load imported libraries and React components to improve your application's loading performance.
+---
+
+Lazy loading in Next.js helps reduce the initial JavaScript bundle by deferring the load of components and libraries until they're needed.
+
+There are two main approaches:
+
+1. **`dynamic()`** from `next/dynamic` — the primary API for lazy loading in the App Router.
+2. **`React.lazy()`** with **`Suspense`** — works in Client Components.
+
+## `dynamic()`
+
+`next/dynamic` is a combination of `React.lazy()` and Suspense. It works in both Server and Client Components.
+
+### Basic usage
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(() => import('./heavy-component'))
+
+export default function Page() {
+  return (
+    <div>
+      <DynamicComponent />
+    </div>
+  )
+}
+```
+
+```jsx app/page.js
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(() => import('./heavy-component'))
+
+export default function Page() {
+  return (
+    <div>
+      <DynamicComponent />
+    </div>
+  )
+}
+```
+
+</CodeGroup>
+
+### Loading UI
+
+Show a fallback while the component loads:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(
+  () => import('./heavy-component'),
+  {
+    loading: () => <p>Loading...</p>,
+  }
+)
+
+export default function Page() {
+  return <DynamicComponent />
+}
+```
+
+```jsx app/page.js
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(
+  () => import('./heavy-component'),
+  {
+    loading: () => <p>Loading...</p>,
+  }
+)
+
+export default function Page() {
+  return <DynamicComponent />
+}
+```
+
+</CodeGroup>
+
+### Disabling SSR
+
+To prevent a component from rendering on the server, use `ssr: false`. This is useful for components that depend on browser APIs:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(
+  () => import('./browser-only-component'),
+  { ssr: false }
+)
+
+export default function Page() {
+  return <DynamicComponent />
+}
+```
+
+```jsx app/page.js
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const DynamicComponent = dynamic(
+  () => import('./browser-only-component'),
+  { ssr: false }
+)
+
+export default function Page() {
+  return <DynamicComponent />
+}
+```
+
+</CodeGroup>
+
+<Warning>
+Using `ssr: false` prevents any server-rendered HTML for that component. Use only when necessary, such as for components that access `window` or other browser-only globals.
+</Warning>
+
+### Named exports
+
+To lazy load a named export from a module, return it from the `Promise` returned by the dynamic import:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import dynamic from 'next/dynamic'
+
+const DynamicChart = dynamic(() =>
+  import('./charts').then((mod) => mod.BarChart)
+)
+
+export default function Page() {
+  return <DynamicChart />
+}
+```
+
+```jsx app/page.js
+import dynamic from 'next/dynamic'
+
+const DynamicChart = dynamic(() =>
+  import('./charts').then((mod) => mod.BarChart)
+)
+
+export default function Page() {
+  return <DynamicChart />
+}
+```
+
+</CodeGroup>
+
+### Lazy loading libraries
+
+Third-party libraries can also be loaded on demand using `import()` inside an event handler:
+
+```tsx app/page.tsx
+'use client'
+
+import { useState } from 'react'
+
+export default function Page() {
+  const [results, setResults] = useState(null)
+
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const { default: Fuse } = await import('fuse.js')
+    const fuse = new Fuse(['item1', 'item2', 'item3'])
+    const result = fuse.search('item')
+    setResults(result)
+  }
+
+  return (
+    <form onSubmit={handleSearch}>
+      <button type="submit">Search</button>
+      {results && <pre>{JSON.stringify(results, null, 2)}</pre>}
+    </form>
+  )
+}
+```
+
+## `React.lazy()` with Suspense
+
+Inside Client Components, you can use `React.lazy()` and `Suspense` directly:
+
+```tsx app/page.tsx
+'use client'
+
+import { lazy, Suspense } from 'react'
+
+const DynamicComponent = lazy(() => import('./heavy-component'))
+
+export default function Page() {
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <DynamicComponent />
+    </Suspense>
+  )
+}
+```
+
+<Note>
+`dynamic()` from `next/dynamic` supports additional options like `ssr: false` that `React.lazy()` does not. Prefer `dynamic()` for full Next.js feature support.
+</Note>
+
+## `dynamic()` options reference
+
+<ParamField path="loader" type="function" required>
+  A function that returns a `Promise` resolving to the component module. Usually an `import()` call.
+
+  ```tsx
+  dynamic(() => import('./my-component'))
+  ```
+</ParamField>
+
+<ParamField path="loading" type="function">
+  A component to render while the dynamic component is loading.
+
+  ```tsx
+  { loading: () => <Skeleton /> }
+  ```
+</ParamField>
+
+<ParamField path="ssr" type="boolean" default="true">
+  Whether to server-side render the component. Set to `false` to skip SSR for browser-only components.
+</ParamField>

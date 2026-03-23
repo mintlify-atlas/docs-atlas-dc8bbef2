@@ -1,0 +1,156 @@
+---
+title: Production checklist
+description: A comprehensive checklist of optimizations and best practices to apply before deploying your Next.js application to production.
+---
+
+Before deploying your Next.js application, there are optimizations and patterns that improve performance, security, and user experience. This checklist covers what Next.js handles automatically and what you should configure manually.
+
+## Automatic optimizations
+
+These are enabled by default and require no configuration:
+
+- **Server Components** — Used by default; no client-side JavaScript is sent for server-rendered components
+- **Code splitting** — Route segments are automatically split; use [lazy loading](/app/optimizations/lazy-loading) for Client Components and third-party libraries where appropriate
+- **Prefetching** — Links entering the viewport are prefetched in the background for near-instant navigation
+- **Prerendering** — Server and Client Components are prerendered at build time and the result is cached
+- **Data caching** — `fetch` requests, server component renders, and static assets are cached automatically
+
+## During development
+
+### Routing and rendering
+
+- Use [Layouts](/api-reference/file-conventions/layout) to share UI across pages and enable partial rendering on navigation
+- Use `<Link>` for client-side navigation and prefetching—avoid `<a>` tags for internal links
+- Create custom [error pages](/app/core-concepts/error-handling) for catch-all errors and 404s
+- Place `'use client'` boundaries carefully to avoid unnecessarily increasing the client-side JavaScript bundle
+- Be aware that Request-time APIs (`cookies`, `headers`, `searchParams`) opt the entire route into [dynamic rendering](/app/core-concepts/rendering)
+- Wrap dynamic sections in `<Suspense>` boundaries for streaming
+
+### Data fetching and caching
+
+- Fetch data in Server Components to avoid unnecessary round-trips
+- Fetch data in parallel where possible to reduce network waterfalls
+- Verify which requests are being cached; use `unstable_cache` for requests that don't use `fetch`
+- Do not call Route Handlers from Server Components—this creates an unnecessary server request
+- Use the `public/` directory for static assets to enable automatic caching
+
+### UI and accessibility
+
+- Use [Server Actions](/app/guides/forms) for form submissions, server-side validation, and error handling
+- Add `app/global-error.tsx` for consistent error fallback UI across your app
+- Use [`next/font`](/api-reference/components/font) to host fonts alongside static assets—eliminates external network requests and reduces layout shift (CLS)
+- Use [`<Image>`](/api-reference/components/image) to automatically optimize images, prevent layout shift, and serve in modern formats (WebP)
+- Use [`<Script>`](/app/optimizations/scripts) to defer third-party scripts and prevent main thread blocking
+- Run `eslint-plugin-jsx-a11y` to catch accessibility issues during development
+
+### Security
+
+- Use [data tainting](/api-reference/config/next-config-js) to prevent sensitive values from being exposed to the client
+- Verify authentication and authorization inside **every** Server Action—not just at the layout or page level
+- Move database access to a `server-only` [Data Access Layer](/app/guides/authentication#creating-a-data-access-layer-dal)
+- Ensure `.env.*` files are in `.gitignore` and only expose values with `NEXT_PUBLIC_` that are intentionally public
+- Consider adding a [Content Security Policy](/app/guides/content-security-policy)
+
+### SEO and metadata
+
+- Use the [Metadata API](/app/optimizations/metadata) for page titles, descriptions, and social sharing tags
+- Generate [Open Graph images](/app/optimizations/metadata) for social sharing
+- Create [sitemaps](/api-reference/functions/generate-metadata) and a [robots.txt](/app/optimizations/metadata) to help search engines crawl your pages
+
+### Type safety
+
+- Use TypeScript throughout your application
+- Enable the [TypeScript plugin](/api-reference/config/typescript) in your editor for real-time type checking
+
+## Before deploying to production
+
+Run these checks before going live:
+
+<Steps>
+  <Step title="Build and test locally">
+    ```bash
+    next build   # catch build errors
+    next start   # test in a production-like environment
+    ```
+  </Step>
+
+  <Step title="Run Lighthouse">
+    Open Chrome, navigate to your local production build, and run Lighthouse in incognito mode. This gives a simulated view of Core Web Vitals (LCP, CLS, INP) and identifies optimization opportunities.
+
+    Use `useReportWebVitals` to send real field data to your analytics:
+
+    ```tsx filename="app/layout.tsx"
+    'use client'
+
+    import { useReportWebVitals } from 'next/web-vitals'
+
+    export function WebVitals() {
+      useReportWebVitals((metric) => {
+        console.log(metric)
+      })
+      return null
+    }
+    ```
+  </Step>
+
+  <Step title="Analyze bundles">
+    Use `@next/bundle-analyzer` to identify large modules:
+
+    ```bash
+    npm install @next/bundle-analyzer
+    ```
+
+    ```js filename="next.config.js"
+    const withBundleAnalyzer = require('@next/bundle-analyzer')({
+      enabled: process.env.ANALYZE === 'true',
+    })
+
+    module.exports = withBundleAnalyzer({})
+    ```
+
+    ```bash
+    ANALYZE=true next build
+    ```
+
+    Additional tools:
+    - [Import Cost](https://marketplace.visualstudio.com/items?itemName=wix.vscode-import-cost) — VS Code extension showing import sizes
+    - [Bundle Phobia](https://bundlephobia.com/) — Check npm package sizes
+    - [bundlejs](https://bundlejs.com/) — Online bundle size checker
+  </Step>
+
+  <Step title="Review security headers">
+    Verify your application sends appropriate security headers. At minimum:
+
+    ```js filename="next.config.js"
+    async headers() {
+      return [
+        {
+          source: '/(.*)',
+          headers: [
+            { key: 'X-Content-Type-Options', value: 'nosniff' },
+            { key: 'X-Frame-Options', value: 'DENY' },
+            { key: 'X-XSS-Protection', value: '1; mode=block' },
+            { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          ],
+        },
+      ]
+    }
+    ```
+  </Step>
+
+  <Step title="Check environment variables">
+    - All secrets are stored in environment variables, not hardcoded
+    - `.env.*` files are in `.gitignore`
+    - Only intentionally public values use the `NEXT_PUBLIC_` prefix
+    - Production environment variables are set correctly in your deployment platform
+  </Step>
+</Steps>
+
+## Monitoring
+
+After deploying:
+
+- Set up error monitoring (Sentry, Datadog, etc.) to capture and alert on runtime errors
+- Configure [OpenTelemetry](/app/guides/open-telemetry) for performance tracing
+- Monitor Core Web Vitals from real user data via your analytics platform
+- Set up uptime monitoring and alerting

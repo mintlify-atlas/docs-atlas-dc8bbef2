@@ -1,0 +1,200 @@
+---
+title: Self-hosting
+description: Learn how to deploy your Next.js application on a Node.js server, Docker container, or as a static export.
+---
+
+When self-hosting Next.js, you have several deployment options depending on your infrastructure. This guide covers configuration for each approach.
+
+<Tip>
+  Watch: [Self-hosting Next.js (45 min)](https://www.youtube.com/watch?v=sIVL4JMqRfc)
+</Tip>
+
+## Reverse proxy
+
+Place a reverse proxy (such as Nginx) in front of your Next.js server rather than exposing it directly to the internet. A proxy handles malformed requests, rate limiting, payload size limits, and security concerns, freeing the Next.js server to focus on rendering.
+
+## Image optimization
+
+`next/image` works with zero configuration when running `next start`. To use a separate image optimization service, configure a [custom image loader](/api-reference/components/image).
+
+<Note>
+  On glibc-based Linux systems, image optimization may require [additional configuration](https://sharp.pixelplumbing.com/install#linux-memory-allocator) to prevent excessive memory usage.
+</Note>
+
+## Environment variables
+
+Server environment variables are available at runtime during dynamic rendering:
+
+```tsx filename="app/page.ts"
+import { connection } from 'next/server'
+
+export default async function Component() {
+  await connection()
+  // Evaluated at runtime, not build time
+  const value = process.env.MY_VALUE
+  // ...
+}
+```
+
+This allows a single Docker image to be promoted through multiple environments with different values.
+
+## Caching and ISR
+
+By default, the Next.js cache is stored on the filesystem. This works automatically when self-hosting with both the Pages and App Router.
+
+### Configuring caching
+
+For distributed deployments (e.g., Kubernetes with multiple pods), configure a custom cache handler to share cache across instances:
+
+```js filename="next.config.js"
+module.exports = {
+  cacheHandler: require.resolve('./cache-handler.js'),
+  cacheMaxMemorySize: 0, // disable default in-memory caching
+}
+```
+
+```js filename="cache-handler.js"
+const cache = new Map()
+
+module.exports = class CacheHandler {
+  constructor(options) {
+    this.options = options
+  }
+
+  async get(key) {
+    return cache.get(key)
+  }
+
+  async set(key, data, ctx) {
+    cache.set(key, {
+      value: data,
+      lastModified: Date.now(),
+      tags: ctx.tags,
+    })
+  }
+
+  async revalidateTag(tags) {
+    tags = [tags].flat()
+    for (let [key, value] of cache) {
+      if (value.tags.some((tag) => tags.includes(tag))) {
+        cache.delete(key)
+      }
+    }
+  }
+
+  resetRequestCache() {}
+}
+```
+
+You can store cached values in external storage like Redis or AWS S3 for consistency across pods.
+
+## Build cache
+
+Use a consistent build ID across containers to avoid stale assets:
+
+```js filename="next.config.js"
+module.exports = {
+  generateBuildId: async () => {
+    return process.env.GIT_HASH
+  },
+}
+```
+
+## Multi-server deployments
+
+### Server Actions encryption key
+
+When running multiple server instances, all must use the same encryption key for Server Actions. Set a consistent key via environment variable:
+
+```bash
+NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=your-generated-key next build
+```
+
+The key must be a base64-encoded value with a valid AES key length (16, 24, or 32 bytes).
+
+### Deployment identifier
+
+Configure a `deploymentId` to enable version skew protection during rolling deployments:
+
+```js filename="next.config.js"
+module.exports = {
+  deploymentId: process.env.DEPLOYMENT_VERSION,
+}
+```
+
+When a deployment ID is configured, Next.js includes it in asset URLs and navigation requests. If a mismatch is detected between client and server, Next.js triggers a full page reload to ensure clients receive consistent assets.
+
+### Shared cache
+
+By default, the in-memory cache is not shared across instances. Use `'use cache: remote'` with a [custom cache handler](/api-reference/config/next-config-js) to store data in external storage.
+
+## Streaming and Suspense
+
+The App Router supports streaming responses when self-hosting. If using Nginx, disable buffering to enable streaming:
+
+```js filename="next.config.js"
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*{/}?',
+        headers: [{ key: 'X-Accel-Buffering', value: 'no' }],
+      },
+    ]
+  },
+}
+```
+
+## Docker deployment
+
+A typical Next.js Dockerfile uses standalone output to minimize image size:
+
+<Steps>
+  <Step title="Enable standalone output">
+    ```js filename="next.config.js"
+    module.exports = {
+      output: 'standalone',
+    }
+    ```
+  </Step>
+
+  <Step title="Build the Docker image">
+    ```dockerfile filename="Dockerfile"
+    FROM node:18-alpine AS base
+
+    FROM base AS deps
+    RUN apk add --no-cache libc6-compat
+    WORKDIR /app
+    COPY package.json package-lock.json* ./
+    RUN npm ci
+
+    FROM base AS builder
+    WORKDIR /app
+    COPY --from=deps /app/node_modules ./node_modules
+    COPY . .
+    RUN npm run build
+
+    FROM base AS runner
+    WORKDIR /app
+    ENV NODE_ENV=production
+    COPY --from=builder /app/public ./public
+    COPY --from=builder /app/.next/standalone ./
+    COPY --from=builder /app/.next/static ./.next/static
+
+    EXPOSE 3000
+    ENV PORT=3000
+    CMD ["node", "server.js"]
+    ```
+  </Step>
+
+  <Step title="Run the container">
+    ```bash
+    docker build -t my-next-app .
+    docker run -p 3000:3000 my-next-app
+    ```
+  </Step>
+</Steps>
+
+## `after()`
+
+The [`after`](/api-reference/functions/after) function is fully supported when self-hosting with `next start`. When stopping the server, send `SIGINT` or `SIGTERM` signals and wait for pending callbacks to complete.

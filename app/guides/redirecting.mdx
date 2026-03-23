@@ -1,0 +1,232 @@
+---
+title: Redirecting
+description: Learn all the ways to handle redirects in Next.js, including redirect(), permanentRedirect(), next.config.js redirects, and middleware redirects.
+---
+
+Next.js provides several ways to handle redirects depending on your use case:
+
+| API | Purpose | Where | Status code |
+|-----|---------|-------|-------------|
+| `redirect()` | Redirect after a mutation or event | Server Components, Server Actions, Route Handlers | 307 or 303 |
+| `permanentRedirect()` | Permanent redirect after a canonical URL change | Server Components, Server Actions, Route Handlers | 308 |
+| `useRouter()` | Client-side navigation | Event handlers in Client Components | N/A |
+| `redirects` in `next.config.js` | Redirect based on path patterns | Config file | 307 or 308 |
+| `NextResponse.redirect` | Redirect based on conditions | Middleware | Any |
+
+## `redirect()`
+
+Use `redirect()` in Server Components, Route Handlers, and Server Actions. It returns a 307 (Temporary Redirect) by default, or 303 (See Other) from a Server Action.
+
+```ts filename="app/actions.ts"
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(id: string) {
+  try {
+    // Call database
+  } catch (error) {
+    // Handle errors
+  }
+
+  revalidatePath('/posts')
+  redirect(`/post/${id}`) // Navigate to the new post
+}
+```
+
+<Note>
+  `redirect` throws internally, so call it **outside** `try/catch` blocks. It also accepts absolute URLs for external redirects.
+</Note>
+
+## `permanentRedirect()`
+
+Use `permanentRedirect()` when a resource's canonical URL changes permanently (for example, after a username change). It returns a 308 status code.
+
+```ts filename="app/actions.ts"
+'use server'
+
+import { permanentRedirect } from 'next/navigation'
+import { revalidateTag } from 'next/cache'
+
+export async function updateUsername(username: string, formData: FormData) {
+  try {
+    // Call database
+  } catch (error) {
+    // Handle errors
+  }
+
+  revalidateTag('username')
+  permanentRedirect(`/profile/${username}`)
+}
+```
+
+## `useRouter()` hook
+
+For programmatic navigation in Client Component event handlers:
+
+```tsx filename="app/page.tsx"
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+<Note>
+  Prefer the `<Link>` component for navigation that doesn't require programmatic control.
+</Note>
+
+## `redirects` in `next.config.js`
+
+Define static redirect rules in your config file. These run before middleware and support path, header, cookie, and query matching:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      // Basic redirect
+      {
+        source: '/about',
+        destination: '/',
+        permanent: true,
+      },
+      // Wildcard path matching
+      {
+        source: '/blog/:slug',
+        destination: '/news/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+
+export default nextConfig
+```
+
+- `permanent: true` → 308 status code
+- `permanent: false` → 307 status code
+
+<Note>
+  Platforms may limit the number of `redirects` entries. On Vercel, the limit is 1,024. For larger redirect sets, use middleware with a redirect map.
+</Note>
+
+## `NextResponse.redirect` in middleware
+
+Use middleware to redirect based on conditions like authentication or feature flags:
+
+```ts filename="middleware.ts"
+import { NextResponse, NextRequest } from 'next/server'
+import { authenticate } from 'auth-provider'
+
+export function middleware(request: NextRequest) {
+  const isAuthenticated = authenticate(request)
+
+  if (isAuthenticated) return NextResponse.next()
+
+  return NextResponse.redirect(new URL('/login', request.url))
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+Middleware runs **after** `redirects` in `next.config.js` and **before** rendering.
+
+## Managing redirects at scale
+
+For 1,000+ redirects, avoid storing them all in `next.config.js`. Instead, use middleware with a database or a Bloom filter for efficient lookups:
+
+### Redirect map with middleware
+
+Store redirects in a key-value store and look them up in middleware:
+
+```ts filename="middleware.ts"
+import { NextResponse, NextRequest } from 'next/server'
+import { get } from '@vercel/edge-config'
+
+type RedirectEntry = {
+  destination: string
+  permanent: boolean
+}
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const redirectData = await get(pathname)
+
+  if (redirectData && typeof redirectData === 'string') {
+    const redirectEntry: RedirectEntry = JSON.parse(redirectData)
+    const statusCode = redirectEntry.permanent ? 308 : 307
+    return NextResponse.redirect(redirectEntry.destination, statusCode)
+  }
+
+  return NextResponse.next()
+}
+```
+
+### Bloom filter optimization
+
+For very large redirect sets, use a [Bloom filter](https://en.wikipedia.org/wiki/Bloom_filter) to check if a redirect might exist before querying the database:
+
+```ts filename="middleware.ts"
+import { NextResponse, NextRequest } from 'next/server'
+import { ScalableBloomFilter } from 'bloom-filters'
+import GeneratedBloomFilter from './redirects/bloom-filter.json'
+
+const bloomFilter = ScalableBloomFilter.fromJSON(GeneratedBloomFilter as any)
+
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  if (bloomFilter.has(pathname)) {
+    const api = new URL(
+      `/api/redirects?pathname=${encodeURIComponent(pathname)}`,
+      request.nextUrl.origin
+    )
+
+    try {
+      const redirectData = await fetch(api)
+      if (redirectData.ok) {
+        const { destination, permanent } = await redirectData.json()
+        if (destination) {
+          return NextResponse.redirect(destination, permanent ? 308 : 307)
+        }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  return NextResponse.next()
+}
+```
+
+The Route Handler reads from a static JSON file and accounts for Bloom filter false positives:
+
+```ts filename="app/api/redirects/route.ts"
+import { NextRequest, NextResponse } from 'next/server'
+import redirects from '@/app/redirects/redirects.json'
+
+type RedirectEntry = { destination: string; permanent: boolean }
+
+export function GET(request: NextRequest) {
+  const pathname = request.nextUrl.searchParams.get('pathname')
+  if (!pathname) return new Response('Bad Request', { status: 400 })
+
+  const redirect = (redirects as Record<string, RedirectEntry>)[pathname]
+  if (!redirect) return new Response('No redirect', { status: 400 })
+
+  return NextResponse.json(redirect)
+}
+```

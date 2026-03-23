@@ -1,0 +1,146 @@
+---
+title: "<Form>"
+description: "The next/form component extends HTML <form> with client-side navigation, search param encoding, prefetching, and Server Action integration."
+---
+
+The `<Form>` component extends the HTML `<form>` element with client-side navigation on submission, prefetching of loading UI, and progressive enhancement.
+
+It is particularly useful for search forms that update URL search params.
+
+```jsx app/ui/search.js
+import Form from 'next/form'
+
+export default function Search() {
+  return (
+    <Form action="/search">
+      {/* Input value is appended to the URL: /search?query=abc */}
+      <input name="query" />
+      <button type="submit">Submit</button>
+    </Form>
+  )
+}
+```
+
+## Behavior
+
+The behavior of `<Form>` depends on the type of the `action` prop:
+
+- **`action` is a string** — behaves like a native HTML `GET` form. Form data is encoded as URL search params and Next.js performs a client-side navigation instead of a full page reload. Shared UI (layouts, loading states) is preserved. The path is also prefetched when the form enters the viewport.
+- **`action` is a function** (Server Action) — behaves like a React form, executing the action on submit.
+
+## Props
+
+### When `action` is a string
+
+<ParamField path="action" type="string" required>
+  The URL or path to navigate to on form submission. An empty string `""` navigates to the same route with updated search params.
+</ParamField>
+
+<ParamField path="replace" type="boolean" default="false">
+  When `true`, replaces the current history entry instead of pushing a new one.
+</ParamField>
+
+<ParamField path="scroll" type="boolean" default="true">
+  Controls scroll behavior on navigation. When `true`, scrolls to the top of the new route and maintains scroll position for back/forward navigation.
+</ParamField>
+
+<ParamField path="prefetch" type="boolean" default="true">
+  Controls whether the destination path is prefetched when the form becomes visible in the viewport.
+</ParamField>
+
+### When `action` is a function
+
+<ParamField path="action" type="function" required>
+  A Server Action to call when the form is submitted. See the [React docs](https://react.dev/reference/react-dom/components/form) for details.
+
+  <Note>When `action` is a function, the `replace` and `scroll` props are ignored.</Note>
+</ParamField>
+
+## Caveats
+
+- **`onSubmit`** — can be used to handle submission logic, but calling `event.preventDefault()` will override `<Form>` navigation behavior.
+- **`method`, `encType`, `target`** — not supported as they override `<Form>` behavior. Use a plain HTML `<form>` if you need these.
+- **`<input type="file">`** — when `action` is a string, submits the filename rather than the file object (matching native browser behavior).
+- **`formAction`** — works in `<button>` or `<input type="submit">` to override `action`, but does not support prefetching.
+
+## Examples
+
+### Search form
+
+Create a search form that navigates to a results page:
+
+```jsx app/page.js
+import Form from 'next/form'
+
+export default function Page() {
+  return (
+    <Form action="/search">
+      <input name="query" />
+      <button type="submit">Search</button>
+    </Form>
+  )
+}
+```
+
+On the results page, read the query from `searchParams`:
+
+```jsx app/search/page.js
+import { getSearchResults } from '@/lib/search'
+
+export default async function SearchPage({ searchParams }) {
+  const results = await getSearchResults((await searchParams).query)
+  return <div>{/* render results */}</div>
+}
+```
+
+Show a loading state while results load:
+
+```jsx app/search/loading.js
+export default function Loading() {
+  return <div>Loading...</div>
+}
+```
+
+For immediate feedback before the loading UI appears, use `useFormStatus`:
+
+```jsx app/ui/search-button.js
+'use client'
+import { useFormStatus } from 'react-dom'
+
+export default function SearchButton() {
+  const status = useFormStatus()
+  return (
+    <button type="submit">
+      {status.pending ? 'Searching...' : 'Search'}
+    </button>
+  )
+}
+```
+
+### Mutations with Server Actions
+
+Pass a Server Action as the `action` prop to perform mutations:
+
+```jsx app/posts/create/page.js
+import Form from 'next/form'
+import { createPost } from '@/posts/actions'
+
+export default function Page() {
+  return (
+    <Form action={createPost}>
+      <input name="title" />
+      <button type="submit">Create Post</button>
+    </Form>
+  )
+}
+```
+
+```js app/posts/actions.js
+'use server'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData) {
+  // create the post...
+  redirect(`/posts/${data.id}`)
+}
+```

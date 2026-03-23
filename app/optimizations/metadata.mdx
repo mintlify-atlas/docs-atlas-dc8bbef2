@@ -1,0 +1,358 @@
+---
+title: Metadata
+description: Define static and dynamic metadata, OpenGraph images, and other SEO tags using the Next.js Metadata APIs.
+---
+
+The Metadata APIs define your application's `<head>` tags for SEO, social sharing, and browser behavior. Next.js automatically generates the relevant HTML from the metadata you export.
+
+<Note>
+The `metadata` export and `generateMetadata` function are only supported in Server Components (layouts and pages).
+</Note>
+
+## Default fields
+
+Two `<meta>` tags are always added by Next.js, even when no metadata is defined:
+
+```html
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+```
+
+## Static metadata
+
+Export a `metadata` object from a `layout.tsx` or `page.tsx` file:
+
+<CodeGroup>
+
+```tsx app/blog/layout.tsx
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My Blog',
+  description: 'Read about the latest topics.',
+}
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
+}
+```
+
+```jsx app/blog/layout.js
+export const metadata = {
+  title: 'My Blog',
+  description: 'Read about the latest topics.',
+}
+
+export default function Layout({ children }) {
+  return <>{children}</>
+}
+```
+
+</CodeGroup>
+
+## Dynamic metadata
+
+Use `generateMetadata` to fetch metadata that depends on route parameters or external data:
+
+<CodeGroup>
+
+```tsx app/blog/[slug]/page.tsx
+import type { Metadata, ResolvingMetadata } from 'next'
+
+type Props = {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export async function generateMetadata(
+  { params, searchParams }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const slug = (await params).slug
+
+  const post = await fetch(`https://api.example.com/blog/${slug}`).then(
+    (res) => res.json()
+  )
+
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default function Page({ params, searchParams }: Props) {
+  return <div />
+}
+```
+
+```jsx app/blog/[slug]/page.js
+export async function generateMetadata({ params, searchParams }, parent) {
+  const slug = (await params).slug
+
+  const post = await fetch(`https://api.example.com/blog/${slug}`).then(
+    (res) => res.json()
+  )
+
+  return {
+    title: post.title,
+    description: post.description,
+  }
+}
+
+export default function Page({ params, searchParams }) {
+  return <div />
+}
+```
+
+</CodeGroup>
+
+### Avoiding duplicate data fetches
+
+When the same data is needed in both `generateMetadata` and the page component, use React's `cache` to deduplicate the request:
+
+<CodeGroup>
+
+```ts app/lib/data.ts
+import { cache } from 'react'
+
+export const getPost = cache(async (slug: string) => {
+  const res = await fetch(`https://api.example.com/blog/${slug}`)
+  return res.json()
+})
+```
+
+```tsx app/blog/[slug]/page.tsx
+import { getPost } from '@/app/lib/data'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  const post = await getPost(params.slug)
+  return { title: post.title, description: post.description }
+}
+
+export default async function Page({ params }: { params: { slug: string } }) {
+  const post = await getPost(params.slug)
+  return <div>{post.title}</div>
+}
+```
+
+</CodeGroup>
+
+## Metadata fields
+
+The `Metadata` object supports the following commonly used fields:
+
+<AccordionGroup>
+  <Accordion title="Basic fields">
+    <ParamField path="title" type="string | object">
+      The page title. Can be a plain string, or an object with `default`, `template`, and `absolute` for title inheritance across layouts.
+
+      ```ts
+      title: 'My Page'
+      // or
+      title: {
+        template: '%s | My Site',
+        default: 'My Site',
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="description" type="string">
+      Page description used by search engines.
+
+      ```ts
+      description: 'A page about Next.js metadata.'
+      ```
+    </ParamField>
+
+    <ParamField path="keywords" type="string | string[]">
+      Keywords for the page.
+
+      ```ts
+      keywords: ['Next.js', 'React', 'metadata']
+      ```
+    </ParamField>
+
+    <ParamField path="authors" type="object[]">
+      Page authors.
+
+      ```ts
+      authors: [{ name: 'Jane Doe', url: 'https://example.com' }]
+      ```
+    </ParamField>
+
+    <ParamField path="alternates" type="object">
+      Canonical and alternate URLs.
+
+      ```ts
+      alternates: {
+        canonical: 'https://example.com/page',
+        languages: {
+          'en-US': 'https://example.com/en/page',
+        },
+      }
+      ```
+    </ParamField>
+  </Accordion>
+
+  <Accordion title="OpenGraph">
+    Used by social platforms (Facebook, LinkedIn, Slack) to generate link previews.
+
+    ```ts
+    openGraph: {
+      title: 'My Page',
+      description: 'A page description.',
+      url: 'https://example.com/page',
+      siteName: 'My Site',
+      images: [
+        {
+          url: 'https://example.com/og.png',
+          width: 1200,
+          height: 630,
+          alt: 'Preview of My Page',
+        },
+      ],
+      type: 'website',
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Twitter card">
+    Controls how your page appears when shared on X (formerly Twitter).
+
+    ```ts
+    twitter: {
+      card: 'summary_large_image',
+      title: 'My Page',
+      description: 'A page description.',
+      creator: '@username',
+      images: ['https://example.com/og.png'],
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Robots">
+    Instructs search engine crawlers.
+
+    ```ts
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+      },
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Icons">
+    Define favicons and Apple touch icons.
+
+    ```ts
+    icons: {
+      icon: '/favicon.ico',
+      apple: '/apple-touch-icon.png',
+      shortcut: '/shortcut-icon.png',
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## File-based metadata
+
+Next.js supports special file conventions that generate metadata automatically:
+
+| File | Purpose |
+|---|---|
+| `favicon.ico` | Browser tab icon |
+| `icon.png` / `icon.svg` | App icon |
+| `apple-icon.png` | Apple touch icon |
+| `opengraph-image.jpg` | OG image for social sharing |
+| `twitter-image.jpg` | Twitter card image |
+| `robots.txt` | Search crawler instructions |
+| `sitemap.xml` | Site URL map for crawlers |
+
+Place these files in the `app` directory (or in a route segment folder for route-specific metadata).
+
+## Generated Open Graph images
+
+Use the `ImageResponse` constructor from `next/og` to generate dynamic OG images using JSX:
+
+<CodeGroup>
+
+```tsx app/blog/[slug]/opengraph-image.tsx
+import { ImageResponse } from 'next/og'
+import { getPost } from '@/app/lib/data'
+
+export const size = { width: 1200, height: 630 }
+export const contentType = 'image/png'
+
+export default async function Image({ params }: { params: { slug: string } }) {
+  const post = await getPost(params.slug)
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    )
+  )
+}
+```
+
+```jsx app/blog/[slug]/opengraph-image.js
+import { ImageResponse } from 'next/og'
+import { getPost } from '@/app/lib/data'
+
+export const size = { width: 1200, height: 630 }
+export const contentType = 'image/png'
+
+export default async function Image({ params }) {
+  const post = await getPost(params.slug)
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    )
+  )
+}
+```
+
+</CodeGroup>
+
+<Note>
+`ImageResponse` supports flexbox and a subset of CSS properties. Advanced layouts using `display: grid` are not supported. Test your OG images at the [Vercel OG Playground](https://og-playground.vercel.app/).
+</Note>
+
+## Streaming metadata
+
+For dynamically rendered pages, Next.js streams metadata separately from page content, injecting it into `<head>` once `generateMetadata` resolves. This means visual content can start streaming before metadata is ready.
+
+Streaming metadata is **disabled for known bots and crawlers** (e.g. `Twitterbot`, `Bingbot`) that expect metadata to be in the initial HTML. You can customize this behavior with the [`htmlLimitedBots`](https://nextjs.org/api-reference/config/next-config-js) config option.

@@ -1,97 +1,112 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Next.js Documentation"
+description: "The React Framework for the Web. Used by some of the world's largest companies, Next.js enables you to create full-stack web applications by extending the latest React features."
 ---
 
-## Setting up
-
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Get Started" icon="rocket" href="/app/getting-started/installation">
+    Install Next.js and create your first application in minutes.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="App Router" icon="layer-group" href="/app/getting-started/introduction">
+    Learn the modern App Router with React Server Components, layouts, and streaming.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="API Reference" icon="code" href="/api-reference/components/image">
+    Explore the full API including components, functions, and configuration options.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Pages Router" icon="file-code" href="/pages/getting-started/introduction">
+    Use the stable Pages Router with `getStaticProps`, `getServerSideProps`, and more.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What is Next.js?
 
-Everything you need to create world-class documentation.
+Next.js is a React framework that gives you the building blocks to create full-stack web applications. It extends React with:
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+- **File-based routing** — Create routes by adding files to your `app/` or `pages/` directory
+- **Server Components** — Render components on the server to reduce client-side JavaScript
+- **Streaming** — Progressively render UI from the server with React Suspense
+- **Built-in optimizations** — Automatic image, font, and script optimization
+- **Turbopack** — Rust-based bundler for fast development builds
+- **Full-stack** — Route Handlers let you build API endpoints alongside your UI
 
-## Need inspiration?
+## Choose your router
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Tabs>
+  <Tab title="App Router (recommended)">
+    The App Router is the modern approach to building Next.js applications. It uses React Server Components by default and supports layouts, nested routing, loading states, error handling, and more.
+
+    ```bash
+    npx create-next-app@latest my-app
+    cd my-app
+    npm run dev
+    ```
+
+    <Card title="Start with App Router" icon="arrow-right" href="/app/getting-started/introduction">
+      Learn the App Router with React Server Components
+    </Card>
+  </Tab>
+  <Tab title="Pages Router">
+    The Pages Router is the original Next.js router. It uses a `pages/` directory and exports React components as pages. It's stable and widely used in production.
+
+    ```bash
+    npx create-next-app@latest my-app --no-app
+    cd my-app
+    npm run dev
+    ```
+
+    <Card title="Start with Pages Router" icon="arrow-right" href="/pages/getting-started/introduction">
+      Learn the Pages Router with getStaticProps and getServerSideProps
+    </Card>
+  </Tab>
+</Tabs>
+
+## Key features
+
+<CardGroup cols={3}>
+  <Card title="Routing" icon="route" href="/app/core-concepts/routing">
+    File-based routing with layouts, dynamic segments, and parallel routes.
+  </Card>
+  <Card title="Data Fetching" icon="database" href="/app/core-concepts/data-fetching">
+    Fetch data on the server or client with async/await and React cache.
+  </Card>
+  <Card title="Caching" icon="bolt" href="/app/core-concepts/caching">
+    Multiple caching layers for fast page loads and reduced API calls.
+  </Card>
+  <Card title="Images" icon="image" href="/app/optimizations/images">
+    Automatic image optimization with lazy loading and modern formats.
+  </Card>
+  <Card title="Fonts" icon="font" href="/app/optimizations/fonts">
+    Zero layout shift font loading with Google Fonts and local fonts.
+  </Card>
+  <Card title="TypeScript" icon="brackets-curly" href="/api-reference/config/typescript">
+    First-class TypeScript support with automatic type checking.
+  </Card>
+</CardGroup>
+
+## Architecture overview
+
+<CardGroup cols={2}>
+  <Card title="Turbopack" icon="zap" href="/architecture/turbopack">
+    Next.js ships with Turbopack, a Rust-based bundler that delivers fast incremental builds.
+  </Card>
+  <Card title="React Server Components" icon="server" href="/app/getting-started/server-and-client-components">
+    Render components on the server for better performance and smaller client bundles.
+  </Card>
+  <Card title="Edge Runtime" icon="globe" href="/api-reference/config/edge">
+    Deploy to edge networks for low-latency responses worldwide.
+  </Card>
+  <Card title="Compiler" icon="cpu" href="/architecture/compiler">
+    SWC-based compiler for fast transforms, minification, and dead code elimination.
+  </Card>
+</CardGroup>
+
+## Community
+
+<CardGroup cols={2}>
+  <Card title="GitHub Discussions" icon="github" href="https://github.com/vercel/next.js/discussions">
+    Ask questions and share ideas with the Next.js community.
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/community/contributing">
+    Learn how to contribute to Next.js and submit your first PR.
+  </Card>
+</CardGroup>

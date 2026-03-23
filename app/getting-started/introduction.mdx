@@ -1,0 +1,81 @@
+---
+title: Introduction
+description: Next.js App Router is a React framework for building full-stack web applications. Learn what it is, why to use it, and how to get started.
+---
+
+Next.js is a React framework that gives you building blocks to create full-stack web applications. You write your UI using React components, and Next.js adds structure, optimizations, and infrastructure on top.
+
+The **App Router** is the current recommended way to build Next.js applications. It is built on top of React Server Components and supports layouts, nested routing, loading states, error handling, and more.
+
+## Why use the App Router?
+
+<CardGroup cols={2}>
+  <Card title="Server Components by default" icon="server">
+    Pages and layouts render on the server, reducing the JavaScript sent to the browser and improving initial load performance.
+  </Card>
+  <Card title="File-system routing" icon="folder-open">
+    Routes are defined by the folder structure inside the `app` directory. No configuration needed.
+  </Card>
+  <Card title="Nested layouts" icon="layout">
+    Layouts wrap pages and preserve state across navigations. Share UI like headers, sidebars, and footers without re-rendering.
+  </Card>
+  <Card title="Streaming and Suspense" icon="bolt">
+    Stream parts of the UI progressively as data becomes available, keeping the experience responsive even for slow data sources.
+  </Card>
+  <Card title="Server Actions" icon="code">
+    Mutate data directly from components using async server functions. No separate API route needed for form submissions.
+  </Card>
+  <Card title="Full-stack in one project" icon="stack">
+    Fetch data, run server logic, and render UI all within a single Next.js application without managing a separate backend.
+  </Card>
+</CardGroup>
+
+## How the App Router works
+
+The `app` directory contains your application's routes. Each folder in `app` maps to a URL segment. Special files like `page.tsx` and `layout.tsx` define what is rendered at each segment.
+
+```
+app/
+├── layout.tsx        # Root layout (required)
+├── page.tsx          # Home page: /
+├── blog/
+│   ├── layout.tsx    # Blog layout: wraps /blog and /blog/[slug]
+│   ├── page.tsx      # Blog index: /blog
+│   └── [slug]/
+│       └── page.tsx  # Blog post: /blog/my-post
+└── dashboard/
+    └── page.tsx      # Dashboard: /dashboard
+```
+
+By default, all components inside `app` are **React Server Components**. You opt into client-side interactivity with the `'use client'` directive.
+
+## Getting started
+
+Work through the guides in order to build a complete understanding of the App Router:
+
+<CardGroup cols={2}>
+  <Card title="Installation" href="/app/getting-started/installation" icon="download">
+    Create a new Next.js app and set up TypeScript, ESLint, and path aliases.
+  </Card>
+  <Card title="Project structure" href="/app/getting-started/project-structure" icon="folder">
+    Learn the folder and file conventions used across a Next.js project.
+  </Card>
+  <Card title="Layouts and pages" href="/app/getting-started/layouts-and-pages" icon="layout">
+    Create pages and shared layouts with file-system routing.
+  </Card>
+  <Card title="Linking and navigating" href="/app/getting-started/linking-and-navigating" icon="link">
+    Use the Link component, prefetching, and streaming for fast navigations.
+  </Card>
+  <Card title="Server and Client Components" href="/app/getting-started/server-and-client-components" icon="split">
+    Understand when to run code on the server vs. the client.
+  </Card>
+  <Card title="Fetching data" href="/app/getting-started/fetching-data" icon="database">
+    Fetch data in Server Components, stream loading states, and handle errors.
+  </Card>
+  <Card title="Mutating data" href="/app/getting-started/mutating-data" icon="pencil">
+    Use Server Actions to handle form submissions and data mutations.
+  </Card>
+  <Card title="Deploying" href="/app/getting-started/deploying" icon="rocket">
+    Deploy to Vercel, self-host with Node.js or Docker, or export as static files.
+  </Card>
+</CardGroup>

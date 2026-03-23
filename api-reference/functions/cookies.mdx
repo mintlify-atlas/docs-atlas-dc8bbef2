@@ -1,0 +1,213 @@
+---
+title: cookies
+description: API reference for the cookies() function, used to read and write HTTP cookies in Server Components, Server Functions, and Route Handlers.
+---
+
+`cookies` is an **async** function that lets you read incoming request cookies in [Server Components](/app/getting-started/server-and-client-components), and read or write outgoing cookies in [Server Functions](/app/getting-started/mutating-data) and [Route Handlers](/api-reference/file-conventions/route).
+
+```typescript app/page.tsx
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  const cookieStore = await cookies()
+  const theme = cookieStore.get('theme')
+  return '...'
+}
+```
+
+## Methods
+
+The object returned by `cookies()` exposes the following methods:
+
+<ResponseField name="get(name)" type="{ name: string; value: string } | undefined">
+  Returns the first cookie with a matching name. Returns `undefined` if not found.
+</ResponseField>
+
+<ResponseField name="getAll(name?)" type="{ name: string; value: string }[]">
+  Returns all cookies with a matching name. If `name` is omitted, returns all cookies.
+</ResponseField>
+
+<ResponseField name="has(name)" type="boolean">
+  Returns `true` if a cookie with the given name exists.
+</ResponseField>
+
+<ResponseField name="set(name, value, options?)" type="void">
+  Sets an outgoing cookie. Only available in Server Functions and Route Handlers.
+</ResponseField>
+
+<ResponseField name="delete(name)" type="void">
+  Deletes a cookie by name. Only available in Server Functions and Route Handlers.
+</ResponseField>
+
+<ResponseField name="toString()" type="string">
+  Returns a string representation of the cookies.
+</ResponseField>
+
+## Cookie options
+
+When calling `set()`, the following options are supported:
+
+<ParamField body="name" type="string">
+  The cookie name.
+</ParamField>
+
+<ParamField body="value" type="string">
+  The cookie value.
+</ParamField>
+
+<ParamField body="expires" type="Date">
+  The exact expiration date.
+</ParamField>
+
+<ParamField body="maxAge" type="number">
+  Cookie lifetime in seconds.
+</ParamField>
+
+<ParamField body="domain" type="string">
+  The domain on which the cookie is available.
+</ParamField>
+
+<ParamField body="path" type="string" default="/">
+  Restricts the cookie to a specific path within the domain.
+</ParamField>
+
+<ParamField body="secure" type="boolean">
+  If `true`, the cookie is only sent over HTTPS.
+</ParamField>
+
+<ParamField body="httpOnly" type="boolean">
+  If `true`, the cookie is inaccessible to client-side JavaScript.
+</ParamField>
+
+<ParamField body="sameSite" type="'lax' | 'strict' | 'none' | boolean">
+  Controls cross-site request behavior.
+</ParamField>
+
+<ParamField body="priority" type="'low' | 'medium' | 'high'">
+  The cookie priority hint.
+</ParamField>
+
+<ParamField body="partitioned" type="boolean">
+  Whether the cookie uses [CHIPS](https://github.com/privacycg/CHIPS) partitioning.
+</ParamField>
+
+## Good to know
+
+- `cookies` is **async** and returns a promise. Use `async/await` or React's [`use`](https://react.dev/reference/react/use).
+- In Next.js 14 and earlier, `cookies` was synchronous. Synchronous access still works in Next.js 15 for backwards compatibility, but is deprecated.
+- `cookies` is a [Request-time API](/app/core-concepts/routing#request-time-apis). Using it in a layout or page opts the route into [dynamic rendering](/app/core-concepts/routing#dynamic-rendering).
+- `delete` and `set` can only be called inside a Server Function or Route Handler — not during Server Component rendering.
+- HTTP does not allow setting cookies after streaming starts, so `set` must be used in a Server Function or Route Handler.
+
+## Examples
+
+### Getting a cookie
+
+```typescript app/page.tsx
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  const cookieStore = await cookies()
+  const theme = cookieStore.get('theme')
+  return '...'
+}
+```
+
+### Getting all cookies
+
+```typescript app/page.tsx
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  const cookieStore = await cookies()
+  return cookieStore.getAll().map((cookie) => (
+    <div key={cookie.name}>
+      <p>Name: {cookie.name}</p>
+      <p>Value: {cookie.value}</p>
+    </div>
+  ))
+}
+```
+
+### Setting a cookie
+
+```typescript app/actions.ts
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function create() {
+  const cookieStore = await cookies()
+
+  cookieStore.set('name', 'lee')
+  // or with options
+  cookieStore.set('name', 'lee', { secure: true })
+  // or with an object
+  cookieStore.set({
+    name: 'name',
+    value: 'lee',
+    httpOnly: true,
+    path: '/',
+  })
+}
+```
+
+### Checking if a cookie exists
+
+```typescript app/page.tsx
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  const cookieStore = await cookies()
+  const hasCookie = cookieStore.has('theme')
+  return '...'
+}
+```
+
+### Deleting cookies
+
+<Tabs>
+  <Tab title="delete()">
+    ```typescript app/actions.ts
+    'use server'
+
+    import { cookies } from 'next/headers'
+
+    export async function deleteCookie() {
+      const cookieStore = await cookies()
+      cookieStore.delete('name')
+    }
+    ```
+  </Tab>
+  <Tab title="Empty value">
+    ```typescript app/actions.ts
+    'use server'
+
+    import { cookies } from 'next/headers'
+
+    export async function deleteCookie() {
+      const cookieStore = await cookies()
+      cookieStore.set('name', '')
+    }
+    ```
+  </Tab>
+  <Tab title="maxAge: 0">
+    ```typescript app/actions.ts
+    'use server'
+
+    import { cookies } from 'next/headers'
+
+    export async function deleteCookie() {
+      const cookieStore = await cookies()
+      cookieStore.set('name', 'value', { maxAge: 0 })
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.0.0-RC` | `cookies` is now async. A [codemod](https://nextjs.org/docs/app/guides/upgrading/codemods) is available. |
+| `v13.0.0` | `cookies` introduced. |

@@ -1,0 +1,208 @@
+---
+title: Single-page applications
+description: Learn how to build SPAs with Next.js, including client-side data fetching patterns, shallow routing, and progressive adoption of server features.
+---
+
+Next.js fully supports building Single-Page Applications (SPAs). You can start with a strict SPA and progressively add server features as your needs grow.
+
+## What is a SPA?
+
+A strict SPA:
+- Serves one HTML file (`index.html`)
+- Handles all routing and data fetching in the browser with JavaScript
+- Does not reload the full page on navigation
+
+Next.js addresses the common pitfalls of strict SPAs: large initial JavaScript bundles and client-side data waterfalls.
+
+## Why use Next.js for SPAs?
+
+- **Automatic code splitting** — Multiple HTML entry points per route, reducing bundle size
+- **Fast navigation** — `next/link` prefetches routes, providing instant transitions
+- **URL-persisted state** — Route state is preserved in the URL for sharing and linking
+- **Progressive enhancement** — Add React Server Components, Server Actions, and more as needed
+
+## Patterns
+
+### Data fetching with context and `use()`
+
+Fetch data in a parent Server Component (or root layout) and pass the Promise to a Client Component via context. This starts data fetching on the server early, avoiding client waterfalls:
+
+```tsx filename="app/layout.tsx"
+import { UserProvider } from './user-provider'
+import { getUser } from './user' // server-side function
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  let userPromise = getUser() // do NOT await
+
+  return (
+    <html lang="en">
+      <body>
+        <UserProvider userPromise={userPromise}>{children}</UserProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+```ts filename="app/user-provider.ts"
+'use client'
+
+import { createContext, useContext, ReactNode } from 'react'
+
+type User = any
+type UserContextType = { userPromise: Promise<User | null> }
+
+const UserContext = createContext<UserContextType | null>(null)
+
+export function useUser(): UserContextType {
+  const context = useContext(UserContext)
+  if (context === null) throw new Error('useUser must be used within a UserProvider')
+  return context
+}
+
+export function UserProvider({
+  children,
+  userPromise,
+}: {
+  children: ReactNode
+  userPromise: Promise<User | null>
+}) {
+  return <UserContext.Provider value={{ userPromise }}>{children}</UserContext.Provider>
+}
+```
+
+Unwrap the Promise in any Client Component with React's `use()`:
+
+```tsx filename="app/profile.tsx"
+'use client'
+
+import { use } from 'react'
+import { useUser } from './user-provider'
+
+export function Profile() {
+  const { userPromise } = useUser()
+  const user = use(userPromise) // suspends until resolved
+
+  return '...'
+}
+```
+
+### Data fetching with SWR
+
+With SWR 2.3.0+ and React 19+, you can provide server-fetched data as SWR fallback without changing existing client code:
+
+```tsx filename="app/layout.tsx"
+import { SWRConfig } from 'swr'
+import { getUser } from './user'
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <SWRConfig
+      value={{
+        fallback: {
+          '/api/user': getUser(), // not awaited
+        },
+      }}
+    >
+      {children}
+    </SWRConfig>
+  )
+}
+```
+
+```tsx filename="app/profile.tsx"
+'use client'
+
+import useSWR from 'swr'
+
+export function Profile() {
+  const { data } = useSWR('/api/user', (url) => fetch(url).then((r) => r.json()))
+  return '...'
+}
+```
+
+The `fallback` data is included in the initial HTML and immediately available to `useSWR`. SWR polling and revalidation still run client-side.
+
+### Rendering only in the browser
+
+Disable prerendering for Client Components that depend on browser APIs:
+
+```jsx
+import dynamic from 'next/dynamic'
+
+const ClientOnlyComponent = dynamic(() => import('./component'), { ssr: false })
+```
+
+### Shallow routing
+
+Update the URL without triggering a full navigation using the native History API. These calls integrate with Next.js hooks like `usePathname` and `useSearchParams`:
+
+```tsx filename="app/ui/sort-products.tsx"
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder: string) {
+    const urlSearchParams = new URLSearchParams(searchParams.toString())
+    urlSearchParams.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${urlSearchParams.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Sort Ascending</button>
+      <button onClick={() => updateSorting('desc')}>Sort Descending</button>
+    </>
+  )
+}
+```
+
+### Using Server Actions in Client Components
+
+Progressively replace API route boilerplate with Server Actions:
+
+```ts filename="app/actions.ts"
+'use server'
+
+export async function create() {}
+```
+
+```tsx filename="app/button.tsx"
+'use client'
+
+import { create } from './actions'
+
+export function Button() {
+  return <button onClick={() => create()}>Create</button>
+}
+```
+
+## Static export
+
+Generate a fully static site with automatic code splitting per route:
+
+```ts filename="next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  output: 'export',
+}
+
+export default nextConfig
+```
+
+After `next build`, the `out/` folder contains separate HTML files per route.
+
+<Note>
+  Next.js server features are not supported with static exports. See [static exports](/app/guides/static-exports#unsupported-features) for the full list.
+</Note>
+
+## Migrating from Create React App or Vite
+
+Next.js provides migration guides for existing SPAs:
+
+- [Migrating from Create React App](https://nextjs.org/docs/app/guides/migrating/from-create-react-app)
+- [Migrating from Vite](https://nextjs.org/docs/app/guides/migrating/from-vite)

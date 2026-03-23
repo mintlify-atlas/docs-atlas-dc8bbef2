@@ -1,0 +1,135 @@
+---
+title: revalidateTag
+description: API reference for the revalidateTag() function, used to invalidate cached data for a specific cache tag on demand.
+---
+
+`revalidateTag` lets you invalidate cached data on-demand for a specific cache tag.
+
+It can be called in **Server Functions** and **Route Handlers** only — not in Client Components or middleware.
+
+```typescript
+revalidateTag(tag: string, profile: string | { expire?: number }): void
+```
+
+## Parameters
+
+<ParamField path="tag" type="string" required>
+  The cache tag to invalidate. Must not exceed 256 characters. Case-sensitive.
+</ParamField>
+
+<ParamField path="profile" type="string | { expire?: number }">
+  Specifies the revalidation behavior:
+
+  - **`'max'`** (recommended) — Marks the tag as stale and uses stale-while-revalidate semantics. Fresh data is fetched in the background on next visit.
+  - **Custom cache life profile** — Any profile defined in your [`cacheLife`](/api-reference/config/next-config-js) config.
+  - **`{ expire: 0 }`** — Expires the tag immediately (use only when external systems require it, such as webhooks).
+  - **No second argument** — Deprecated. Immediately expires the tag. Migrate to `'max'` or [`updateTag`](/api-reference/functions/revalidate-tag).
+</ParamField>
+
+## Returns
+
+`revalidateTag` returns `void`.
+
+## Tagging data
+
+Before calling `revalidateTag`, data must be tagged:
+
+<Tabs>
+  <Tab title="fetch">
+    ```typescript
+    await fetch('https://api.example.com/posts', {
+      next: { tags: ['posts'] },
+    })
+    ```
+  </Tab>
+  <Tab title="use cache">
+    ```typescript
+    import { cacheTag } from 'next/cache'
+
+    async function getData() {
+      'use cache'
+      cacheTag('posts')
+      // ...
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Good to know
+
+- With `profile="max"`, revalidation is triggered only when a page using that tag is next visited — calling `revalidateTag` does not immediately re-render pages.
+- The single-argument form `revalidateTag(tag)` is deprecated. Use the two-argument signature.
+- Use [`updateTag`](/api-reference/functions/revalidate-tag) in Server Actions for immediate cache expiration instead of `{ expire: 0 }`.
+
+## Relationship with `revalidatePath`
+
+| Function | Scope |
+| --- | --- |
+| `revalidateTag` | Invalidates data with specific tags across **all** pages |
+| `revalidatePath` | Invalidates a specific page or layout path |
+
+They are often used together to ensure comprehensive data consistency:
+
+```typescript
+'use server'
+
+import { revalidatePath, updateTag } from 'next/cache'
+
+export async function updatePost() {
+  await updatePostInDatabase()
+
+  revalidatePath('/blog')  // Refresh the blog page
+  updateTag('posts')       // Refresh all pages using the 'posts' tag
+}
+```
+
+## Examples
+
+### In a Server Action
+
+```typescript app/actions.ts
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export default async function submit() {
+  await addPost()
+  revalidateTag('posts', 'max')
+}
+```
+
+### In a Route Handler
+
+```typescript app/api/revalidate/route.ts
+import type { NextRequest } from 'next/server'
+import { revalidateTag } from 'next/cache'
+
+export async function GET(request: NextRequest) {
+  const tag = request.nextUrl.searchParams.get('tag')
+
+  if (tag) {
+    revalidateTag(tag, 'max')
+    return Response.json({ revalidated: true, now: Date.now() })
+  }
+
+  return Response.json({
+    revalidated: false,
+    now: Date.now(),
+    message: 'Missing tag to revalidate',
+  })
+}
+```
+
+### Immediate expiration (webhooks)
+
+For external services that require immediate expiration:
+
+```typescript app/api/webhook/route.ts
+import { revalidateTag } from 'next/cache'
+
+export async function POST(request: Request) {
+  const { tag } = await request.json()
+  revalidateTag(tag, { expire: 0 })
+  return Response.json({ ok: true })
+}
+```

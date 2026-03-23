@@ -1,0 +1,157 @@
+---
+title: next build
+description: Build your Next.js application for production with next build.
+---
+
+`next build` creates an optimized production build of your application. The output shows a summary of each route:
+
+```bash
+Route (app)
+┌ ○ /_not-found
+└ ƒ /products/[id]
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+```
+
+## Usage
+
+```bash
+next build [directory] [options]
+```
+
+## Options
+
+<ParamField path="[directory]" type="string">
+  The directory containing the Next.js application. Defaults to the current working directory.
+</ParamField>
+
+<ParamField path="--turbopack" type="boolean">
+  Force Turbopack (the default bundler). Also available as `--turbo`.
+</ParamField>
+
+<ParamField path="--webpack" type="boolean">
+  Build using Webpack instead of the default Turbopack.
+</ParamField>
+
+<ParamField path="-d / --debug" type="boolean">
+  Enable verbose build output. Shows rewrites, redirects, and headers configuration.
+</ParamField>
+
+<ParamField path="--profile" type="boolean">
+  Enable production [React profiling](https://react.dev/reference/react/Profiler). Adds a small overhead.
+</ParamField>
+
+<ParamField path="--no-lint" type="boolean">
+  Disable linting during the build.
+</ParamField>
+
+<ParamField path="--no-mangling" type="boolean">
+  Disable [name mangling](https://en.wikipedia.org/wiki/Name_mangling). Reduces performance; use only for debugging.
+</ParamField>
+
+<ParamField path="--experimental-app-only" type="boolean">
+  Build only App Router routes, skipping Pages Router routes.
+</ParamField>
+
+<ParamField path="--experimental-build-mode [mode]" type="string" default="default">
+  Use an experimental build mode. Choices: `'compile'`, `'generate'`, `'default'`.
+</ParamField>
+
+<ParamField path="--debug-prerender" type="boolean">
+  Debug prerender errors in a development-like build. Do not deploy builds produced with this flag.
+</ParamField>
+
+<ParamField path="--debug-build-paths=<patterns>" type="string">
+  Build only specific routes (comma-separated file paths or globs). Useful for faster targeted debugging.
+</ParamField>
+
+<ParamField path="--experimental-cpu-prof" type="boolean">
+  Enable CPU profiling via V8's inspector. Profiles are saved to `.next/cpu-profiles/` on process exit.
+</ParamField>
+
+<ParamField path="-h / --help" type="boolean">
+  Show all available options.
+</ParamField>
+
+## Build output analysis
+
+The build output shows route types and sizes. Use `next experimental-analyze` for detailed bundle composition:
+
+```bash
+npx next experimental-analyze
+```
+
+This opens an interactive bundle explorer in the browser without producing build artifacts.
+
+## Standalone output
+
+To produce a self-contained deployment artifact, set `output: 'standalone'` in `next.config.js`:
+
+```js next.config.js
+module.exports = {
+  output: 'standalone',
+}
+```
+
+After running `next build`, copy static assets and start the server:
+
+```bash
+cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+node .next/standalone/server.js
+```
+
+## Build traces
+
+Next.js generates `.nft.json` trace files in `.next/` that list all files required by each route. These are used by `output: 'standalone'` to create a minimal deployment bundle.
+
+## Examples
+
+### Debug prerender errors
+
+```bash
+next build --debug-prerender
+```
+
+This disables minification, enables server source maps, and continues past the first prerender error to surface all issues at once.
+
+<Warning>
+Do not deploy builds created with `--debug-prerender`—they may have reduced performance.
+</Warning>
+
+### Build specific routes
+
+```bash
+# Single route
+next build --debug-build-paths="app/page.tsx"
+
+# Multiple routes
+next build --debug-build-paths="app/page.tsx,pages/index.tsx"
+
+# Glob patterns
+next build --debug-build-paths="app/**/page.tsx"
+```
+
+### CPU profiling
+
+```bash
+next build --experimental-cpu-prof
+```
+
+For Turbopack builds, profiles are named:
+- `build-main-*` — main orchestration process
+- `build-turbopack-*` — Turbopack compilation worker
+
+For Webpack builds:
+- `build-main-*` — main orchestration process
+- `build-webpack-client-*` — client bundle worker
+- `build-webpack-server-*` — server bundle worker
+- `build-webpack-edge-server-*` — edge runtime worker
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v16.0.0` | Turbopack is the default bundler; JS bundle size metrics removed from output |
+| `v15.5.0` | Turbopack `build` support in beta |
+| `v15.4.0` | `--debug-prerender` flag added |

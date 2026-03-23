@@ -1,0 +1,190 @@
+---
+title: Contributing to Next.js
+description: Learn how to set up your development environment, run tests, and submit pull requests to the Next.js repository.
+---
+
+Next.js is open source and welcomes contributions from the community. This page walks you through setting up your environment, making changes, and opening a pull request.
+
+<Tip>
+  Before jumping into a PR, search [existing issues](https://github.com/vercel/next.js/issues) and [pull requests](https://github.com/vercel/next.js/pulls) to avoid duplicating work. There is also a [40-minute walkthrough video](https://www.youtube.com/watch?v=cuoNzXFLitc) that covers the contribution process end to end.
+</Tip>
+
+## Development branch
+
+All development happens on the `canary` branch. Open pull requests against `canary`, not `main`. Changes on `canary` are published to npm under the `@canary` tag regularly.
+
+## Setting up your environment
+
+<Steps>
+  <Step title="Install dependencies">
+    You need Node.js and pnpm. Enable pnpm with Corepack:
+
+    ```bash
+    corepack enable pnpm
+    ```
+
+    Optionally, install [fnm](https://github.com/Schniz/fnm) or [nvm](https://github.com/nvm-sh/nvm) to use the exact Node.js version specified in `.node-version`.
+  </Step>
+  <Step title="Clone the repository">
+    Use a blobless clone for speed:
+
+    ```bash
+    gh repo clone vercel/next.js -- --filter=blob:none --single-branch
+
+    # or via HTTPS
+    git clone https://github.com/vercel/next.js.git --filter=blob:none --single-branch
+    ```
+  </Step>
+  <Step title="Install Node.js packages">
+    ```bash
+    pnpm install
+    ```
+  </Step>
+  <Step title="Start the watch build">
+    Start a background watch process that recompiles Next.js on every file change:
+
+    ```bash
+    pnpm dev
+    ```
+
+    This is much faster than a full build during iteration (~1–2 seconds per change vs ~60 seconds for a full build).
+  </Step>
+  <Step title="Create a branch">
+    ```bash
+    git switch --create my-feature-branch
+    ```
+  </Step>
+</Steps>
+
+## Building
+
+You can build the full project (TypeScript + Webpack bundling + type definitions) with:
+
+```bash
+pnpm build
+```
+
+To build both JavaScript and Rust code (required after switching branches or when touching Turbopack):
+
+```bash
+pnpm build-all
+```
+
+For type errors only (faster than a full build):
+
+```bash
+pnpm --filter=next types
+```
+
+If you modify Rust code, build new native bindings with:
+
+```bash
+pnpm swc-build-native
+```
+
+## Running tests
+
+Build the project before running tests for the first time:
+
+```bash
+pnpm build
+```
+
+Next.js has several test modes:
+
+<Tabs>
+  <Tab title="Development (Turbopack)">
+    ```bash
+    pnpm test-dev-turbo test/e2e/app-dir/app/
+    ```
+  </Tab>
+  <Tab title="Development (Webpack)">
+    ```bash
+    pnpm test-dev-webpack test/e2e/app-dir/app/
+    ```
+  </Tab>
+  <Tab title="Production (Turbopack)">
+    ```bash
+    pnpm test-start-turbo test/e2e/app-dir/app/
+    ```
+  </Tab>
+  <Tab title="Unit tests">
+    ```bash
+    pnpm test-unit
+    ```
+  </Tab>
+</Tabs>
+
+End-to-end tests run in complete isolation: a local version of Next.js is packed and installed in a temporary directory, a server is started on a random port, and the directory is cleaned up after the suite finishes.
+
+<Note>
+  Skip the isolation step with `NEXT_SKIP_ISOLATE=1` for faster iteration, but do not use this flag when verifying module resolution or new package exports — it hides resolution failures that only appear when Next.js is installed as a real npm package.
+</Note>
+
+## Generating a new test
+
+Use the interactive generator to scaffold a new test suite from a template:
+
+```bash
+pnpm new-test
+```
+
+For non-interactive use (for example, in scripts):
+
+```bash
+# pnpm new-test -- --args <appDir> <name> <type>
+# appDir: true/false
+# type: e2e | production | development | unit
+pnpm new-test -- --args true my-feature e2e
+```
+
+## Making a pull request
+
+<Steps>
+  <Step title="Run linting and formatting">
+    ```bash
+    pnpm prettier-fix
+    pnpm lint-fix
+    ```
+  </Step>
+  <Step title="Commit your changes">
+    ```bash
+    git add .
+    git commit -m "describe your changes"
+    ```
+  </Step>
+  <Step title="Open a PR with the GitHub CLI">
+    ```bash
+    gh pr create
+    ```
+
+    This forks the repository and sets up a remote branch automatically.
+  </Step>
+</Steps>
+
+The Next.js or Developer Experience team will review your changes, leave feedback, and merge when the PR is ready.
+
+## Contribution areas
+
+<CardGroup cols={2}>
+  <Card title="Core" icon="code" href="https://github.com/vercel/next.js/tree/canary/contributing/core">
+    Bug fixes, new features, and performance improvements to the framework runtime.
+  </Card>
+  <Card title="Documentation" icon="book" href="https://github.com/vercel/next.js/tree/canary/contributing/docs">
+    Improving docs, fixing typos, and writing new sections.
+  </Card>
+  <Card title="Examples" icon="layers" href="https://github.com/vercel/next.js/tree/canary/examples">
+    Integrations with other tools and services.
+  </Card>
+  <Card title="Turbopack" icon="bolt" href="https://github.com/vercel/next.js/tree/canary/contributing/turbopack">
+    The Rust-based bundler. Requires a Rust toolchain.
+  </Card>
+</CardGroup>
+
+## Good first issues
+
+Look for issues labeled [`good first issue`](https://github.com/vercel/next.js/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22) on GitHub. These are scoped tasks that are well-suited for new contributors.
+
+## Code of conduct
+
+All contributors are expected to follow the [Next.js Code of Conduct](https://github.com/vercel/next.js/blob/canary/CODE_OF_CONDUCT.md). We are committed to maintaining a welcoming and respectful community.

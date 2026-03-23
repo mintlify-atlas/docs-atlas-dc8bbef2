@@ -1,0 +1,155 @@
+---
+title: useRouter
+description: API reference for the useRouter hook, used to programmatically navigate between routes in Client Components.
+---
+
+`useRouter` is a Client Component hook that lets you programmatically change routes.
+
+<Tip>
+  Use the [`<Link>` component](/api-reference/components/link) for navigation unless you have a specific reason to use `useRouter`.
+</Tip>
+
+```typescript app/example-client-component.tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button type="button" onClick={() => router.push('/dashboard')}>
+      Dashboard
+    </button>
+  )
+}
+```
+
+<Warning>
+  `useRouter` must only be used in Client Components. Import from `next/navigation`, not `next/router`.
+</Warning>
+
+## Methods
+
+<ResponseField name="push(href, options?)" type="void">
+  Navigates to the given route and adds a new entry to the browser history stack.
+
+  **Options:**
+  - `scroll?: boolean` — Whether to scroll to the top after navigation (default: `true`).
+  - `transitionTypes?: string[]` — Passed to [`React.addTransitionType`](https://react.dev/reference/react/addTransitionType) inside the navigation Transition.
+</ResponseField>
+
+<ResponseField name="replace(href, options?)" type="void">
+  Navigates to the given route without adding a new history entry (replaces the current one).
+
+  **Options:** same as `push`.
+</ResponseField>
+
+<ResponseField name="refresh()" type="void">
+  Refreshes the current route by making a new request to the server. Re-fetches data and re-renders Server Components. The client merges the result without losing unaffected React state or browser state (e.g. scroll position).
+
+  This clears the [Client Cache](/app/core-concepts/routing#client-cache) for the current route. To also invalidate server-side cache, use [`revalidatePath`](/api-reference/functions/revalidate-path) or [`revalidateTag`](/api-reference/functions/revalidate-tag).
+</ResponseField>
+
+<ResponseField name="prefetch(href, options?)" type="void">
+  Prefetches the route for faster client-side transitions.
+
+  **Options:**
+  - `onInvalidate?: () => void` — Called when the prefetched data becomes stale.
+</ResponseField>
+
+<ResponseField name="back()" type="void">
+  Navigates back to the previous entry in the browser history stack.
+</ResponseField>
+
+<ResponseField name="forward()" type="void">
+  Navigates forward to the next entry in the browser history stack.
+</ResponseField>
+
+## Good to know
+
+- Do not pass untrusted or unsanitized URLs to `router.push` or `router.replace`. Passing `javascript:` URLs can execute arbitrary code in your page (XSS).
+- `refresh()` may produce the same result if `fetch` requests are still cached. Other Request-time APIs like `cookies` and `headers` can also affect the response.
+- The `onInvalidate` callback is called at most once per prefetch request.
+
+## Examples
+
+### Disabling scroll to top
+
+```typescript app/example.tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button
+      type="button"
+      onClick={() => router.push('/dashboard', { scroll: false })}
+    >
+      Dashboard (no scroll)
+    </button>
+  )
+}
+```
+
+### Listening for route changes
+
+Compose `usePathname` and `useSearchParams` to react to route changes:
+
+```typescript app/components/navigation-events.tsx
+'use client'
+
+import { useEffect } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
+
+export function NavigationEvents() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const url = `${pathname}?${searchParams}`
+    console.log('Navigated to:', url)
+  }, [pathname, searchParams])
+
+  return null
+}
+```
+
+Wrap in a `Suspense` boundary when used in a layout, since `useSearchParams` suspends during prerendering:
+
+```typescript app/layout.tsx
+import { Suspense } from 'react'
+import { NavigationEvents } from './components/navigation-events'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <Suspense fallback={null}>
+          <NavigationEvents />
+        </Suspense>
+      </body>
+    </html>
+  )
+}
+```
+
+## Migrating from `next/router`
+
+| Old (`next/router`) | New (`next/navigation`) |
+| --- | --- |
+| `useRouter()` | `useRouter()` |
+| `router.pathname` | `usePathname()` |
+| `router.query` | `useSearchParams()` |
+| `router.events` | Compose `usePathname` + `useSearchParams` |
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.4.0` | Optional `onInvalidate` callback for `router.prefetch` introduced. |
+| `v13.0.0` | `useRouter` from `next/navigation` introduced. |

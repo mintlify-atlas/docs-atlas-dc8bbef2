@@ -1,0 +1,190 @@
+---
+title: Sass
+description: Style your Next.js application using Sass with .scss and .sass file extensions.
+---
+
+Next.js has built-in support for Sass after the package is installed. You can use both `.scss` and `.sass` syntax.
+
+## Installation
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install --save-dev sass
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add -D sass
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add -D sass
+    ```
+  </Tab>
+  <Tab title="bun">
+    ```bash
+    bun add -D sass
+    ```
+  </Tab>
+</Tabs>
+
+## Usage with CSS Modules
+
+Use Sass with CSS Modules by creating a file with the `.module.scss` or `.module.sass` extension:
+
+<CodeGroup>
+
+```scss app/blog/blog.module.scss
+$padding: 24px;
+
+.blog {
+  padding: $padding;
+
+  h1 {
+    font-size: 2rem;
+  }
+}
+```
+
+```tsx app/blog/page.tsx
+import styles from './blog.module.scss'
+
+export default function Page() {
+  return <main className={styles.blog}></main>
+}
+```
+
+```jsx app/blog/page.js
+import styles from './blog.module.scss'
+
+export default function Page() {
+  return <main className={styles.blog}></main>
+}
+```
+
+</CodeGroup>
+
+## Global Sass
+
+Import global `.scss` or `.sass` files in your root layout just like global CSS:
+
+<CodeGroup>
+
+```scss app/globals.scss
+$font-size-base: 16px;
+
+body {
+  font-size: $font-size-base;
+  margin: 0;
+}
+```
+
+```tsx app/layout.tsx
+import './globals.scss'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import './globals.scss'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+## Configuring Sass options
+
+To configure the Sass compiler, use `sassOptions` in `next.config.js`. You can pass any option supported by the `sass` package:
+
+<CodeGroup>
+
+```ts next.config.ts
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
+  sassOptions: {
+    // Additional load paths for @use and @import
+    loadPaths: ['./styles'],
+    // Silence deprecation warnings
+    silenceDeprecations: ['legacy-js-api'],
+  },
+}
+
+export default config
+```
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  sassOptions: {
+    loadPaths: ['./styles'],
+    silenceDeprecations: ['legacy-js-api'],
+  },
+}
+
+module.exports = nextConfig
+```
+
+</CodeGroup>
+
+### Using a custom Sass implementation
+
+You can specify an alternative implementation such as `sass-embedded`:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  sassOptions: {
+    implementation: 'sass-embedded',
+  },
+}
+
+module.exports = nextConfig
+```
+
+## Shared variables with CSS Modules
+
+To share Sass variables across all CSS Module files without importing them manually, use the `additionalData` option:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  sassOptions: {
+    additionalData: `@use "@/styles/variables" as *;`,
+  },
+}
+
+module.exports = nextConfig
+```
+
+Then define your shared variables:
+
+```scss styles/variables.scss
+$primary-color: #3b82f6;
+$font-size-base: 16px;
+```
+
+Now every CSS Module can use `$primary-color` and `$font-size-base` without an explicit `@use` import.
+
+<Note>
+The `.scss` (SCSS syntax) and `.sass` (indented syntax) file extensions are both supported. Choose one based on your team's preference—SCSS is more common.
+</Note>

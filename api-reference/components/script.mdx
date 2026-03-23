@@ -1,0 +1,217 @@
+---
+title: "<Script>"
+description: "Optimize third-party script loading in your Next.js application using the built-in next/script component with fine-grained loading strategies."
+---
+
+The `<Script>` component gives you control over when third-party scripts load, helping you improve performance without manually managing `<script>` tag placement.
+
+```jsx app/dashboard/page.js
+import Script from 'next/script'
+
+export default function Dashboard() {
+  return (
+    <>
+      <Script src="https://example.com/script.js" />
+    </>
+  )
+}
+```
+
+## Props
+
+<ParamField path="src" type="string" required>
+  The URL of the external script to load. Required unless you are using an inline script.
+
+  ```jsx
+  <Script src="https://example.com/script.js" />
+  ```
+</ParamField>
+
+<ParamField path="strategy" type="string" default="afterInteractive">
+  Controls when the script loads. Four strategies are available:
+
+  - `"beforeInteractive"` — loads before any Next.js code and before page hydration
+  - `"afterInteractive"` — (default) loads early, after some hydration has occurred
+  - `"lazyOnload"` — loads during browser idle time, after all other resources
+  - `"worker"` — (experimental) offloads the script to a web worker
+</ParamField>
+
+<ParamField path="onLoad" type="function">
+  Called once after the script finishes loading. Use to run initialization code that depends on the script.
+
+  Only works with `afterInteractive` and `lazyOnload` strategies. Requires a Client Component.
+
+  ```jsx
+  'use client'
+
+  <Script
+    src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js"
+    onLoad={() => console.log(_.sample([1, 2, 3, 4]))}
+  />
+  ```
+</ParamField>
+
+<ParamField path="onReady" type="function">
+  Called after the script loads and on every subsequent component mount (for example, after client-side navigation). Useful for scripts that need to reinitialize on navigation.
+
+  Requires a Client Component.
+
+  ```jsx
+  'use client'
+
+  import { useRef } from 'react'
+  import Script from 'next/script'
+
+  export default function Page() {
+    const mapRef = useRef()
+    return (
+      <>
+        <div ref={mapRef} />
+        <Script
+          id="google-maps"
+          src="https://maps.googleapis.com/maps/api/js"
+          onReady={() => {
+            new google.maps.Map(mapRef.current, {
+              center: { lat: -34.397, lng: 150.644 },
+              zoom: 8,
+            })
+          }}
+        />
+      </>
+    )
+  }
+  ```
+</ParamField>
+
+<ParamField path="onError" type="function">
+  Called if the script fails to load. Cannot be used with `beforeInteractive`. Requires a Client Component.
+
+  ```jsx
+  'use client'
+
+  <Script
+    src="https://example.com/script.js"
+    onError={(e) => console.error('Script failed to load', e)}
+  />
+  ```
+</ParamField>
+
+## Loading strategies
+
+### `beforeInteractive`
+
+Injects the script into the initial HTML from the server. The script downloads before any Next.js module but does not block hydration.
+
+Must be placed in the root layout (`app/layout.js`). Use only for critical scripts needed site-wide, such as bot detectors and cookie consent managers.
+
+```jsx app/layout.js
+import Script from 'next/script'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <Script
+          src="https://example.com/script.js"
+          strategy="beforeInteractive"
+        />
+      </body>
+    </html>
+  )
+}
+```
+
+<Note>Scripts with `beforeInteractive` are always injected into the `<head>` regardless of their placement in the component tree.</Note>
+
+### `afterInteractive`
+
+The default strategy. Injects the script client-side after some hydration has occurred. Good for tag managers and analytics.
+
+```jsx app/page.js
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      <Script src="https://example.com/script.js" strategy="afterInteractive" />
+    </>
+  )
+}
+```
+
+### `lazyOnload`
+
+Injects the script client-side during browser idle time, after all other resources have loaded. Use for low-priority scripts like chat widgets and social media embeds.
+
+```jsx app/page.js
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      <Script src="https://example.com/script.js" strategy="lazyOnload" />
+    </>
+  )
+}
+```
+
+### `worker` (experimental)
+
+<Warning>
+  The `worker` strategy is experimental and does not yet work with the App Router. Use with caution.
+</Warning>
+
+Offloads the script to a web worker to keep the main thread free for first-party code. Requires enabling `nextScriptWorkers` in `next.config.js`:
+
+```js next.config.js
+module.exports = {
+  experimental: {
+    nextScriptWorkers: true,
+  },
+}
+```
+
+Currently only supported in the `pages/` directory:
+
+```jsx pages/home.js
+import Script from 'next/script'
+
+export default function Home() {
+  return (
+    <>
+      <Script src="https://example.com/script.js" strategy="worker" />
+    </>
+  )
+}
+```
+
+## Inline scripts
+
+For inline scripts, use the `id` prop so Next.js can track and optimize the script:
+
+```jsx
+<Script id="analytics-init">
+  {`window.dataLayer = window.dataLayer || [];`}
+</Script>
+```
+
+Or use `dangerouslySetInnerHTML`:
+
+```jsx
+<Script
+  id="show-banner"
+  dangerouslySetInnerHTML={{
+    __html: `document.getElementById('banner').classList.remove('hidden');`,
+  }}
+/>
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.0.0` | `beforeInteractive` and `afterInteractive` updated to support App Router |
+| `v12.2.4` | `onReady` prop added |
+| `v12.2.2` | `beforeInteractive` supported in `_document` |
+| `v11.0.0` | `next/script` introduced |

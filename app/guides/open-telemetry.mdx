@@ -1,0 +1,157 @@
+---
+title: OpenTelemetry
+description: Learn how to instrument your Next.js application with OpenTelemetry for observability, tracing, and performance monitoring.
+---
+
+Observability is crucial for understanding the behavior and performance of your Next.js application. Next.js has built-in OpenTelemetry support—framework internals are already instrumented with spans.
+
+OpenTelemetry is platform-agnostic: you can switch observability providers without changing your code.
+
+## Getting started
+
+The quickest way to add OpenTelemetry is with the `@vercel/otel` package.
+
+### Using `@vercel/otel`
+
+<Steps>
+  <Step title="Install packages">
+    <Tabs>
+      <Tab title="npm">
+        ```bash
+        npm install @vercel/otel @opentelemetry/sdk-logs @opentelemetry/api-logs @opentelemetry/instrumentation
+        ```
+      </Tab>
+      <Tab title="pnpm">
+        ```bash
+        pnpm add @vercel/otel @opentelemetry/sdk-logs @opentelemetry/api-logs @opentelemetry/instrumentation
+        ```
+      </Tab>
+      <Tab title="yarn">
+        ```bash
+        yarn add @vercel/otel @opentelemetry/sdk-logs @opentelemetry/api-logs @opentelemetry/instrumentation
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Create instrumentation.ts">
+    Create an `instrumentation.ts` file in the root of your project (or in `/src` if you use that layout):
+
+    ```ts filename="instrumentation.ts"
+    import { registerOTel } from '@vercel/otel'
+
+    export function register() {
+      registerOTel({ serviceName: 'next-app' })
+    }
+    ```
+
+    <Note>
+      The `instrumentation` file must be in the project root, not inside `app/` or `pages/`.
+    </Note>
+  </Step>
+</Steps>
+
+### Manual configuration
+
+For full control over the OpenTelemetry SDK, configure it manually. Because `NodeSDK` is not compatible with the Edge runtime, conditionally import it:
+
+```bash
+npm install @opentelemetry/sdk-node @opentelemetry/resources @opentelemetry/semantic-conventions @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http
+```
+
+```ts filename="instrumentation.ts"
+export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./instrumentation.node.ts')
+  }
+}
+```
+
+```ts filename="instrumentation.node.ts"
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
+import { resourceFromAttributes } from '@opentelemetry/resources'
+import { NodeSDK } from '@opentelemetry/sdk-node'
+import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
+
+const sdk = new NodeSDK({
+  resource: resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: 'next-app',
+  }),
+  spanProcessor: new SimpleSpanProcessor(new OTLPTraceExporter()),
+})
+sdk.start()
+```
+
+## Testing your instrumentation
+
+Use the [OpenTelemetry dev environment](https://github.com/vercel/opentelemetry-collector-dev-setup) to test traces locally.
+
+When working correctly, you should see a root span labeled `GET /requested/pathname` with all other spans from that trace nested under it.
+
+To see additional spans:
+
+```bash
+NEXT_OTEL_VERBOSE=1 next dev
+```
+
+## Custom spans
+
+Add custom spans using the OpenTelemetry API:
+
+```bash
+npm install @opentelemetry/api
+```
+
+```ts
+import { trace } from '@opentelemetry/api'
+
+export async function fetchGithubStars() {
+  return await trace
+    .getTracer('nextjs-example')
+    .startActiveSpan('fetchGithubStars', async (span) => {
+      try {
+        return await getValue()
+      } finally {
+        span.end()
+      }
+    })
+}
+```
+
+## Default spans
+
+Next.js automatically instruments the following spans:
+
+| Span | Type | Description |
+|------|------|-------------|
+| `[http.method] [next.route]` | `BaseServer.handleRequest` | Root span for each incoming request |
+| `render route (app) [next.route]` | `AppRender.getBodyResult` | Route rendering in the App Router |
+| `fetch [http.method] [http.url]` | `AppRender.fetch` | Fetch request in your code |
+| `executing api route (app) [next.route]` | `AppRouteRouteHandlers.runHandler` | Route Handler execution |
+| `generateMetadata [next.page]` | `ResolveMetadata.generateMetadata` | Metadata generation for a page |
+| `resolve page components` | `NextNodeServer.findPageComponents` | Page component resolution |
+| `resolve segment modules` | `NextNodeServer.getLayoutOrPageModule` | Layout or page module loading |
+| `start response` | `NextNodeServer.startResponse` | Time when first byte is sent |
+
+Span attributes follow [OpenTelemetry semantic conventions](https://opentelemetry.io/docs/reference/specification/trace/semantic_conventions/) plus custom `next.*` attributes:
+
+- `next.span_name` — Duplicates the span name
+- `next.span_type` — Unique identifier for the span type
+- `next.route` — Route pattern (e.g., `/[param]/user`)
+- `next.rsc` — Whether the request is an RSC prefetch request
+- `next.page` — Internal path to a special file (e.g., `page.ts`, `layout.ts`)
+
+<Note>
+  Set `NEXT_OTEL_FETCH_DISABLED=1` to disable automatic instrumentation of `fetch` calls if you use a custom fetch instrumentation library.
+</Note>
+
+## Deployment
+
+### Vercel
+
+OpenTelemetry works out of the box on Vercel. Follow the [Vercel observability quickstart](https://vercel.com/docs/concepts/observability/otel-overview/quickstart) to connect to an observability provider.
+
+### Self-hosted
+
+Spin up an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/getting-started/) to receive and process telemetry from your Next.js app, then configure `@vercel/otel` or a custom exporter to send data to the collector.

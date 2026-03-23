@@ -1,0 +1,278 @@
+---
+title: Styling
+description: CSS Modules, global CSS, styled-jsx, Sass, and CSS-in-JS in the Pages Router.
+---
+
+Next.js supports several approaches to styling. You can use them individually or in combination.
+
+## CSS Modules
+
+CSS Modules scope CSS locally by automatically generating unique class names. Create a file with the `.module.css` extension:
+
+```css components/Button.module.css
+.button {
+  background: blue;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+```
+
+Import it as an object:
+
+```tsx components/Button.tsx
+import styles from './Button.module.css'
+
+export default function Button({ children }: { children: React.ReactNode }) {
+  return <button className={styles.button}>{children}</button>
+}
+```
+
+The generated class name is unique (e.g., `Button_button__abc12`), so there are no naming conflicts between components.
+
+## Global CSS
+
+Import global CSS files in `pages/_app.tsx`. They apply to every page in your application.
+
+```css styles/globals.css
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
+```
+
+```tsx pages/_app.tsx
+import type { AppProps } from 'next/app'
+import '../styles/globals.css'
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />
+}
+```
+
+<Warning>
+Global CSS can only be imported inside `pages/_app.tsx`. Importing global CSS anywhere else will cause an error.
+</Warning>
+
+## styled-jsx
+
+styled-jsx is built into Next.js. It provides scoped CSS within a component using a `<style jsx>` tag:
+
+```tsx pages/index.tsx
+export default function Home() {
+  return (
+    <div>
+      <p>Hello, world</p>
+      <style jsx>{`
+        p {
+          color: blue;
+          font-size: 18px;
+        }
+      `}</style>
+    </div>
+  )
+}
+```
+
+The styles are scoped to the component—they do not leak to children or other components.
+
+### Global styles with styled-jsx
+
+Add the `global` attribute to apply styles globally from within a component:
+
+```tsx
+<style jsx global>{`
+  body {
+    background: #f5f5f5;
+  }
+`}</style>
+```
+
+<Note>
+The App Router does not include styled-jsx by default. CSS Modules and Tailwind CSS are the recommended styling options for new projects.
+</Note>
+
+## Sass
+
+Next.js has built-in support for Sass (`.scss` and `.sass` files). Install the `sass` package first:
+
+```bash
+npm install --save-dev sass
+```
+
+Then use `.module.scss` for scoped styles or import `.scss` files globally in `_app.tsx`:
+
+<CodeGroup>
+
+```scss components/Button.module.scss
+$primary: #0070f3;
+
+.button {
+  background: $primary;
+  color: white;
+  padding: 8px 16px;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+```
+
+```tsx components/Button.tsx
+import styles from './Button.module.scss'
+
+export default function Button({ children }: { children: React.ReactNode }) {
+  return <button className={styles.button}>{children}</button>
+}
+```
+
+</CodeGroup>
+
+### Configuring Sass options
+
+You can pass options to the Sass compiler in `next.config.js`:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  sassOptions: {
+    includePaths: ['./styles'],
+  },
+}
+
+module.exports = nextConfig
+```
+
+## CSS-in-JS
+
+CSS-in-JS libraries that require server-side rendering (such as styled-components or Emotion) need additional setup for the Pages Router. They require customizing `pages/_document.tsx` to inject styles on the server.
+
+### styled-components
+
+Install styled-components:
+
+```bash
+npm install styled-components
+npm install --save-dev @types/styled-components babel-plugin-styled-components
+```
+
+Create a `.babelrc` to enable the plugin:
+
+```json .babelrc
+{
+  "presets": ["next/babel"],
+  "plugins": [["babel-plugin-styled-components", { "ssr": true }]]
+}
+```
+
+Customize `_document.tsx` to collect and inject styles during SSR:
+
+```tsx pages/_document.tsx
+import Document, {
+  Html,
+  Head,
+  Main,
+  NextScript,
+  DocumentContext,
+} from 'next/document'
+import { ServerStyleSheet } from 'styled-components'
+
+export default class MyDocument extends Document {
+  static async getInitialProps(ctx: DocumentContext) {
+    const sheet = new ServerStyleSheet()
+    const originalRenderPage = ctx.renderPage
+
+    try {
+      ctx.renderPage = () =>
+        originalRenderPage({
+          enhanceApp: (App) => (props) =>
+            sheet.collectStyles(<App {...props} />),
+        })
+
+      const initialProps = await Document.getInitialProps(ctx)
+      return {
+        ...initialProps,
+        styles: [
+          initialProps.styles,
+          sheet.getStyleElement(),
+        ],
+      }
+    } finally {
+      sheet.seal()
+    }
+  }
+
+  render() {
+    return (
+      <Html lang="en">
+        <Head />
+        <body>
+          <Main />
+          <NextScript />
+        </body>
+      </Html>
+    )
+  }
+}
+```
+
+Now you can use styled-components throughout your pages:
+
+```tsx components/Button.tsx
+import styled from 'styled-components'
+
+const StyledButton = styled.button`
+  background: blue;
+  color: white;
+  padding: 8px 16px;
+`
+
+export default StyledButton
+```
+
+### Emotion
+
+Emotion requires a similar `_document.tsx` customization. Refer to the [Emotion SSR documentation](https://emotion.sh/docs/ssr) for the exact setup.
+
+<Warning>
+CSS-in-JS libraries that require `renderPage` customization in `_document.tsx` will not work with the App Router without additional changes. CSS Modules or Tailwind CSS are preferred for App Router projects.
+</Warning>
+
+## Tailwind CSS
+
+To use Tailwind CSS in a Pages Router project, install it and configure PostCSS:
+
+```bash
+npm install --save-dev tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+```
+
+Update `tailwind.config.js` to include your files:
+
+```js tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx}',
+    './components/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+Add the Tailwind directives to your global CSS file and import it in `_app.tsx`:
+
+```css styles/globals.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```

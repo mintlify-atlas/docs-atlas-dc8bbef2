@@ -1,0 +1,260 @@
+---
+title: CSS-in-JS
+description: Use CSS-in-JS libraries like styled-components and Emotion with the Next.js App Router.
+---
+
+CSS-in-JS lets you write CSS directly in your JavaScript or TypeScript files, typically co-located with the component that uses it.
+
+<Warning>
+Many CSS-in-JS libraries that rely on runtime JavaScript are **not compatible with React Server Components**. You can only use CSS-in-JS in Client Components. Check your library's documentation for Server Component support.
+</Warning>
+
+## Supported libraries
+
+The following libraries are known to work with the App Router Client Components:
+
+<Columns cols={2}>
+  <Card title="styled-components" icon="paintbrush" href="#styled-components">
+    Tagged template literal API with full theming support.
+  </Card>
+  <Card title="Emotion" icon="smile" href="#emotion">
+    High-performance CSS-in-JS library with `css` prop and styled API.
+  </Card>
+  <Card title="Kuma UI" icon="layers">
+    Zero-runtime utility-first CSS-in-JS.
+  </Card>
+  <Card title="vanilla-extract" icon="flask">
+    Type-safe, zero-runtime CSS-in-JS.
+  </Card>
+</Columns>
+
+## styled-components
+
+### Installation
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install styled-components
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add styled-components
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add styled-components
+    ```
+  </Tab>
+</Tabs>
+
+### Configuration
+
+Enable styled-components in `next.config.js` to activate the built-in Babel plugin for server-side rendering:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  compiler: {
+    styledComponents: true,
+  },
+}
+
+module.exports = nextConfig
+```
+
+### Registry
+
+To use styled-components with the App Router, you need to set up a client-side style registry. This collects styles generated during a render and flushes them into the `<head>` of the document.
+
+```tsx lib/registry.tsx
+'use client'
+
+import React, { useState } from 'react'
+import { useServerInsertedHTML } from 'next/navigation'
+import { ServerStyleSheet, StyleSheetManager } from 'styled-components'
+
+export default function StyledComponentsRegistry({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  // Only create stylesheet once with lazy initial state
+  const [styledComponentsStyleSheet] = useState(() => new ServerStyleSheet())
+
+  useServerInsertedHTML(() => {
+    const styles = styledComponentsStyleSheet.getStyleElement()
+    styledComponentsStyleSheet.instance.clearTag()
+    return <>{styles}</>
+  })
+
+  if (typeof window !== 'undefined') return <>{children}</>
+
+  return (
+    <StyleSheetManager sheet={styledComponentsStyleSheet.instance}>
+      {children}
+    </StyleSheetManager>
+  )
+}
+```
+
+Wrap your root layout's children with the registry:
+
+```tsx app/layout.tsx
+import StyledComponentsRegistry from './lib/registry'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
+      </body>
+    </html>
+  )
+}
+```
+
+### Usage
+
+Use styled-components only in Client Components:
+
+```tsx app/components/Button.tsx
+'use client'
+
+import styled from 'styled-components'
+
+const StyledButton = styled.button`
+  background-color: #3b82f6;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #2563eb;
+  }
+`
+
+export function Button({ children }: { children: React.ReactNode }) {
+  return <StyledButton>{children}</StyledButton>
+}
+```
+
+## Emotion
+
+### Installation
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install @emotion/react @emotion/styled
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm add @emotion/react @emotion/styled
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add @emotion/react @emotion/styled
+    ```
+  </Tab>
+</Tabs>
+
+### Registry
+
+Emotion requires a similar server-side registry to styled-components:
+
+```tsx lib/registry.tsx
+'use client'
+
+import { useState } from 'react'
+import { useServerInsertedHTML } from 'next/navigation'
+import { CacheProvider } from '@emotion/react'
+import createCache from '@emotion/cache'
+
+export default function EmotionRegistry({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [{ cache, flush }] = useState(() => {
+    const cache = createCache({ key: 'css' })
+    cache.compat = true
+    const prevInsert = cache.insert
+    let inserted: string[] = []
+    cache.insert = (...args) => {
+      const serialized = args[1]
+      if (cache.inserted[serialized.name] === undefined) {
+        inserted.push(serialized.name)
+      }
+      return prevInsert(...args)
+    }
+    const flush = () => {
+      const prevInserted = inserted
+      inserted = []
+      return prevInserted
+    }
+    return { cache, flush }
+  })
+
+  useServerInsertedHTML(() => {
+    const names = flush()
+    if (names.length === 0) return null
+    let styles = ''
+    for (const name of names) {
+      styles += cache.inserted[name]
+    }
+    return (
+      <style
+        data-emotion={`${cache.key} ${names.join(' ')}`}
+        dangerouslySetInnerHTML={{ __html: styles }}
+      />
+    )
+  })
+
+  return <CacheProvider value={cache}>{children}</CacheProvider>
+}
+```
+
+### Usage
+
+Use Emotion in Client Components:
+
+```tsx app/components/Card.tsx
+'use client'
+
+import { css } from '@emotion/react'
+import styled from '@emotion/styled'
+
+const cardStyle = css`
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+`
+
+const StyledCard = styled.div`
+  ${cardStyle}
+  background: white;
+`
+
+export function Card({ children }: { children: React.ReactNode }) {
+  return <StyledCard>{children}</StyledCard>
+}
+```
+
+## Server Components
+
+CSS-in-JS libraries that depend on runtime style injection cannot be used in Server Components. For Server Components, use:
+
+- [CSS Modules](/app/styling/css) — zero runtime, statically extracted at build time.
+- [Tailwind CSS](/app/styling/tailwind-css) — utility classes with no JavaScript runtime.
+- [Sass](/app/styling/sass) — pre-processed CSS compiled at build time.

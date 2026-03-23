@@ -1,0 +1,648 @@
+---
+title: next.config.js
+description: Configure your Next.js application with next.config.js or next.config.ts, covering output, images, redirects, rewrites, headers, env, webpack, and more.
+---
+
+Next.js is configured through a `next.config.js` (or `next.config.ts`) file in the root of your project, alongside `package.json`.
+
+<CodeGroup>
+
+```js next.config.js
+// @ts-check
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  /* config options here */
+}
+
+module.exports = nextConfig
+```
+
+```ts next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  /* config options here */
+}
+
+export default nextConfig
+```
+
+</CodeGroup>
+
+<Note>
+`next.config.js` is a Node.js module, not a JSON file. It is used by the Next.js server and build phases and is not included in the browser bundle. Use `next.config.mjs` for ECMAScript module syntax, or `next.config.ts` for TypeScript.
+</Note>
+
+## File formats
+
+<AccordionGroup>
+  <Accordion title="ESM (next.config.mjs)">
+
+```js next.config.mjs
+// @ts-check
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  /* config options here */
+}
+
+export default nextConfig
+```
+
+  </Accordion>
+  <Accordion title="Function form">
+
+You can export a function that receives the current phase and default config:
+
+```js next.config.js
+const { PHASE_DEVELOPMENT_SERVER } = require('next/constants')
+
+module.exports = (phase, { defaultConfig }) => {
+  if (phase === PHASE_DEVELOPMENT_SERVER) {
+    return {
+      /* development-only options */
+    }
+  }
+
+  return {
+    /* options for all other phases */
+  }
+}
+```
+
+  </Accordion>
+  <Accordion title="Async function form">
+
+```js next.config.js
+module.exports = async (phase, { defaultConfig }) => {
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    /* config options here */
+  }
+  return nextConfig
+}
+```
+
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Output
+
+Controls how Next.js outputs the built application.
+
+<ParamField path="output" type="string" default="undefined">
+  Sets the output mode for the build. Accepted values: `'standalone'` or `'export'`.
+</ParamField>
+
+### `'standalone'`
+
+Creates a self-contained `.next/standalone` folder that includes only the files needed for production deployment. A minimal `server.js` is generated that can replace `next start`.
+
+```js next.config.js
+module.exports = {
+  output: 'standalone',
+}
+```
+
+Start the standalone server:
+
+```bash
+node .next/standalone/server.js
+```
+
+<Note>
+The `public` and `.next/static` directories are not copied automatically—copy them manually after build:
+
+```bash
+cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+```
+</Note>
+
+### `'export'`
+
+Generates a fully static HTML export to the `out/` directory. No Node.js server is required.
+
+```js next.config.js
+module.exports = {
+  output: 'export',
+}
+```
+
+<Warning>
+Static export does not support features that require a server: image optimization (unless using a custom loader), rewrites, redirects, middleware, and incremental static regeneration.
+</Warning>
+
+### Output file tracing
+
+For monorepos, set `outputFileTracingRoot` to include files from parent directories:
+
+```js next.config.js
+const path = require('path')
+
+module.exports = {
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
+  outputFileTracingIncludes: {
+    '/api/route': ['./necessary-folder/**/*'],
+  },
+  outputFileTracingExcludes: {
+    '/api/route': ['./unnecessary-folder/**/*'],
+  },
+}
+```
+
+---
+
+## Images
+
+<ParamField path="images" type="object">
+  Configuration for the built-in image optimization API used by `next/image`.
+</ParamField>
+
+### Remote patterns
+
+```js next.config.js
+module.exports = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'example.com',
+        port: '',
+        pathname: '/images/**',
+      },
+    ],
+  },
+}
+```
+
+<ParamField path="images.remotePatterns" type="object[]">
+  Allowlist of remote image sources. Each entry can specify `protocol`, `hostname`, `port`, and `pathname` glob.
+</ParamField>
+
+<ParamField path="images.domains" type="string[]" deprecated>
+  Legacy allowlist of hostnames. Prefer `remotePatterns` for more precise control.
+</ParamField>
+
+### Sizes and formats
+
+```js next.config.js
+module.exports = {
+  images: {
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+    dangerouslyAllowSVG: false,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+}
+```
+
+<ParamField path="images.deviceSizes" type="number[]" default="[640, 750, 828, 1080, 1200, 1920, 2048, 3840]">
+  Breakpoints used to generate `srcset` values for device widths.
+</ParamField>
+
+<ParamField path="images.imageSizes" type="number[]" default="[16, 32, 48, 64, 96, 128, 256, 384]">
+  Additional image widths used when the `sizes` prop is provided.
+</ParamField>
+
+<ParamField path="images.formats" type="string[]" default="['image/webp']">
+  Accepted MIME types for image optimization. Set to `['image/avif', 'image/webp']` to enable AVIF.
+</ParamField>
+
+<ParamField path="images.minimumCacheTTL" type="number" default="60">
+  Minimum cache TTL in seconds for optimized images.
+</ParamField>
+
+<ParamField path="images.dangerouslyAllowSVG" type="boolean" default="false">
+  Allow serving SVG images from the optimization endpoint. Ensure `contentSecurityPolicy` is also set.
+</ParamField>
+
+### Custom loader
+
+```js next.config.js
+module.exports = {
+  images: {
+    loader: 'custom',
+    loaderFile: './my/image/loader.js',
+  },
+}
+```
+
+---
+
+## Redirects
+
+Redirects an incoming request path to a different destination path. Returns an array of redirect objects.
+
+```js next.config.js
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/old-blog/:slug',
+        destination: '/blog/:slug',
+        permanent: true,
+      },
+    ]
+  },
+}
+```
+
+<ParamField path="redirects[].source" type="string" required>
+  Incoming request path pattern. Supports named parameters (`:slug`), wildcards (`:slug*`), and regex.
+</ParamField>
+
+<ParamField path="redirects[].destination" type="string" required>
+  The path to redirect to. Named parameters captured in `source` can be referenced here.
+</ParamField>
+
+<ParamField path="redirects[].permanent" type="boolean" required>
+  When `true`, uses HTTP 308 (permanent, cached by clients). When `false`, uses HTTP 307 (temporary).
+</ParamField>
+
+<ParamField path="redirects[].has" type="object[]">
+  Array of conditions based on headers, cookies, or query params that must be present for the redirect to apply.
+</ParamField>
+
+<ParamField path="redirects[].missing" type="object[]">
+  Array of conditions that must NOT be present for the redirect to apply.
+</ParamField>
+
+<ParamField path="redirects[].basePath" type="boolean">
+  Set to `false` to exclude the `basePath` prefix from matching.
+</ParamField>
+
+### Conditional redirects
+
+```js next.config.js
+module.exports = {
+  async redirects() {
+    return [
+      {
+        source: '/:path((?!another-page$).*)',
+        has: [{ type: 'header', key: 'x-redirect-me' }],
+        permanent: false,
+        destination: '/another-page',
+      },
+    ]
+  },
+}
+```
+
+---
+
+## Rewrites
+
+Rewrites map an incoming request path to a different destination path without changing the URL visible to the user.
+
+```js next.config.js
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/about',
+        destination: '/',
+      },
+    ]
+  },
+}
+```
+
+For granular control, `rewrites` can return an object with `beforeFiles`, `afterFiles`, and `fallback` arrays:
+
+```js next.config.js
+module.exports = {
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // checked before filesystem (pages/_next)
+        { source: '/some-page', destination: '/somewhere-else', has: [{ type: 'query', key: 'overrideMe' }] },
+      ],
+      afterFiles: [
+        // checked after pages/public files but before dynamic routes
+        { source: '/non-existent', destination: '/somewhere-else' },
+      ],
+      fallback: [
+        // checked after dynamic routes
+        { source: '/:path*', destination: 'https://my-old-site.example.com/:path*' },
+      ],
+    }
+  },
+}
+```
+
+---
+
+## Headers
+
+Set custom HTTP response headers for matching paths.
+
+```js next.config.js
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
+        ],
+      },
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+<ParamField path="headers[].source" type="string" required>
+  Incoming request path pattern.
+</ParamField>
+
+<ParamField path="headers[].headers" type="object[]" required>
+  Array of `{ key, value }` objects to set on matching responses.
+</ParamField>
+
+---
+
+## Environment variables
+
+Inline build-time environment variables into the JavaScript bundle.
+
+```js next.config.js
+module.exports = {
+  env: {
+    customKey: 'my-value',
+  },
+}
+```
+
+`process.env.customKey` is replaced with `'my-value'` at build time.
+
+<Note>
+Variables set here are always inlined into the bundle. For runtime environment variables (not inlined), use `.env` files with the `NEXT_PUBLIC_` prefix or server-side access.
+</Note>
+
+---
+
+## TypeScript config
+
+<ParamField path="typescript.ignoreBuildErrors" type="boolean" default="false">
+  Skip TypeScript type-checking during `next build`. Useful for CI pipelines where type-checking runs separately.
+</ParamField>
+
+<ParamField path="typescript.tsconfigPath" type="string">
+  Path to a custom `tsconfig.json` file, relative to the project root.
+</ParamField>
+
+```js next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  typescript: {
+    // Dangerously allow production builds with type errors
+    ignoreBuildErrors: true,
+    tsconfigPath: 'tsconfig.build.json',
+  },
+}
+
+export default nextConfig
+```
+
+---
+
+## ESLint config
+
+<Note>
+`next lint` and the `eslint` option in `next.config.js` were removed in Next.js 16. Use the ESLint CLI directly.
+</Note>
+
+---
+
+## Webpack customization
+
+Extend the webpack configuration used by Next.js. The function is called three times: once for the client bundle and twice for server-side bundles (Node.js and Edge runtimes).
+
+```js next.config.js
+module.exports = {
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }) => {
+    // Add a custom loader
+    config.module.rules.push({
+      test: /\.mdx/,
+      use: [
+        defaultLoaders.babel,
+        {
+          loader: '@mdx-js/loader',
+          options: {},
+        },
+      ],
+    })
+
+    // Important: return the modified config
+    return config
+  },
+}
+```
+
+The second argument provides:
+
+| Property | Type | Description |
+|---|---|---|
+| `buildId` | `string` | Unique identifier for the current build |
+| `dev` | `boolean` | `true` when compiling in development mode |
+| `isServer` | `boolean` | `true` for server-side compilation |
+| `nextRuntime` | `string \| undefined` | `'edge'` or `'nodejs'` for server; `undefined` for client |
+| `defaultLoaders.babel` | `object` | Default `babel-loader` configuration |
+
+<Warning>
+Changes to the webpack configuration are not covered by semver. Proceed with caution and test thoroughly after upgrading Next.js.
+</Warning>
+
+---
+
+## reactStrictMode
+
+<ParamField path="reactStrictMode" type="boolean" default="false">
+  Enables React Strict Mode for the entire application. Useful for surfacing potential issues in your components during development.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  reactStrictMode: true,
+}
+```
+
+---
+
+## poweredByHeader
+
+<ParamField path="poweredByHeader" type="boolean" default="true">
+  When `false`, removes the `X-Powered-By: Next.js` HTTP response header.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  poweredByHeader: false,
+}
+```
+
+---
+
+## basePath
+
+<ParamField path="basePath" type="string">
+  Deploy the Next.js application under a sub-path of a domain. All page routes and static assets are automatically prefixed.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  basePath: '/docs',
+}
+```
+
+Links using `next/link` and `next/router` will automatically use the configured `basePath`. Prefix external links manually.
+
+---
+
+## trailingSlash
+
+<ParamField path="trailingSlash" type="boolean" default="false">
+  When `true`, URLs without a trailing slash are redirected to their trailing-slash equivalent (e.g. `/about` → `/about/`).
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  trailingSlash: true,
+}
+```
+
+---
+
+## assetPrefix
+
+<ParamField path="assetPrefix" type="string">
+  Prefix for all static asset URLs. Use this to serve assets from a CDN.
+</ParamField>
+
+```js next.config.js
+const isProd = process.env.NODE_ENV === 'production'
+
+module.exports = {
+  assetPrefix: isProd ? 'https://cdn.example.com' : undefined,
+}
+```
+
+---
+
+## experimental
+
+The `experimental` object exposes features that are still in development. These options are subject to change and may be removed without a major version bump.
+
+```js next.config.js
+module.exports = {
+  experimental: {
+    typedRoutes: true,
+    typedEnv: true,
+    reactCompiler: true,
+  },
+}
+```
+
+See the [config-shared.ts](https://github.com/vercel/next.js/blob/canary/packages/next/src/server/config-shared.ts) source for the full list of experimental options.
+
+---
+
+## Other options
+
+<AccordionGroup>
+  <Accordion title="compress">
+
+<ParamField path="compress" type="boolean" default="true">
+  Enable gzip compression for rendered content and static files when using `next start`. Has no effect if you use a reverse proxy that already handles compression.
+</ParamField>
+
+  </Accordion>
+  <Accordion title="distDir">
+
+<ParamField path="distDir" type="string" default="'.next'">
+  Change the build output directory.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  distDir: 'build',
+}
+```
+
+  </Accordion>
+  <Accordion title="generateEtags">
+
+<ParamField path="generateEtags" type="boolean" default="true">
+  Generate ETags for every page. Disable if your reverse proxy handles ETags.
+</ParamField>
+
+  </Accordion>
+  <Accordion title="pageExtensions">
+
+<ParamField path="pageExtensions" type="string[]" default="['tsx', 'ts', 'jsx', 'js']">
+  Extensions recognized as pages or layouts.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js', 'md', 'mdx'],
+}
+```
+
+  </Accordion>
+  <Accordion title="serverExternalPackages">
+
+<ParamField path="serverExternalPackages" type="string[]">
+  Opt specific packages out of server-component bundling so they use native `require()`.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  serverExternalPackages: ['@prisma/client'],
+}
+```
+
+  </Accordion>
+  <Accordion title="transpilePackages">
+
+<ParamField path="transpilePackages" type="string[]">
+  Automatically transpile and bundle packages from `node_modules`.
+</ParamField>
+
+```js next.config.js
+module.exports = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+}
+```
+
+  </Accordion>
+</AccordionGroup>
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v15.0.0` | `next.config.ts` support added |
+| `v13.0.0` | App Router introduced |
+| `v12.1.0` | Async configuration function supported |

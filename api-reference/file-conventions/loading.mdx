@@ -1,0 +1,135 @@
+---
+title: "loading.js"
+description: "API reference for the loading.js file convention. Creates an automatic Suspense boundary that shows instant loading UI while route content streams in."
+---
+
+The `loading.js` file creates an automatic [React Suspense](https://react.dev/reference/react/Suspense) boundary around the `page.js` file and its children. The fallback UI is shown immediately on navigation and swapped for the real content once it finishes streaming.
+
+```jsx app/dashboard/loading.js
+export default function Loading() {
+  return <LoadingSkeleton />
+}
+```
+
+## Parameters
+
+Loading UI components do not accept any parameters.
+
+## Behavior
+
+### Instant loading states
+
+The fallback UI is prefetched along with the route, so navigation feels instant. You can use any lightweight UI: skeletons, spinners, or a partial preview of the page content (cover photo, title, etc.).
+
+`loading.js` automatically wraps `page.js` and nested layouts in a `<Suspense>` boundary within the same route segment.
+
+### Navigation
+
+- Navigation is interruptible — users can navigate away before the page finishes loading
+- Shared layouts remain interactive while new segments load
+- The fallback is prefetched, making navigation feel immediate
+
+### Layouts and loading.js
+
+`loading.js` sits below `layout.js` in the component hierarchy. This means it cannot show a fallback for uncached or runtime data access in the layout itself (such as `cookies()`, `headers()`, or uncached `fetch` calls).
+
+To ensure instant navigation when a layout fetches data:
+
+- Wrap runtime data access in the layout with its own `<Suspense>` boundary
+- Move uncached data fetching from `layout.js` into `page.js`
+
+```jsx app/dashboard/layout.js
+import { Suspense } from 'react'
+import { NavSkeleton } from './nav-skeleton'
+import { DashboardNav } from './dashboard-nav'
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Suspense fallback={<NavSkeleton />}>
+        <DashboardNav />
+      </Suspense>
+      <main>{children}</main>
+    </>
+  )
+}
+```
+
+### Status codes
+
+Streamed responses return a `200` status code. Errors and not-found states are communicated through the streamed content itself. Because headers are sent before streaming begins, the status code cannot be changed after streaming starts.
+
+## Platform support
+
+| Deployment option | Supported |
+| --- | --- |
+| Node.js server | Yes |
+| Docker container | Yes |
+| Static export | No |
+| Adapters | Platform-specific |
+
+## Examples
+
+### Skeleton loading UI
+
+```jsx app/dashboard/loading.js
+export default function Loading() {
+  return (
+    <div className="space-y-4">
+      <div className="h-8 w-1/3 animate-pulse bg-gray-200 rounded" />
+      <div className="h-4 w-full animate-pulse bg-gray-200 rounded" />
+      <div className="h-4 w-2/3 animate-pulse bg-gray-200 rounded" />
+    </div>
+  )
+}
+```
+
+### Granular Suspense boundaries
+
+You can also manually place `<Suspense>` boundaries for individual components rather than wrapping the entire page:
+
+```jsx app/dashboard/page.js
+import { Suspense } from 'react'
+import { PostFeed, Weather } from './components'
+
+export default function Posts() {
+  return (
+    <section>
+      <Suspense fallback={<p>Loading feed...</p>}>
+        <PostFeed />
+      </Suspense>
+      <Suspense fallback={<p>Loading weather...</p>}>
+        <Weather />
+      </Suspense>
+    </section>
+  )
+}
+```
+
+This gives you:
+1. **Streaming server rendering** — HTML is progressively sent from server to client
+2. **Selective hydration** — React prioritizes making the most-interacted components interactive first
+
+### Pending state with useFormStatus
+
+For `<Form>` submissions, use `useFormStatus` to show pending state before the loading UI appears:
+
+```jsx app/ui/search-button.js
+'use client'
+import { useFormStatus } from 'react-dom'
+
+export default function SearchButton() {
+  const status = useFormStatus()
+  return (
+    <button type="submit">
+      {status.pending ? 'Searching...' : 'Search'}
+    </button>
+  )
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.0.0` | `loading` introduced |

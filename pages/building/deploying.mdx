@@ -1,0 +1,217 @@
+---
+title: Deploying
+description: Deploy your Next.js Pages Router app to Vercel, a Node.js server, Docker, or as a static export.
+---
+
+A Next.js Pages Router application can be deployed to any Node.js environment, containerized with Docker, or exported as static HTML.
+
+## Deploying to Vercel
+
+[Vercel](https://vercel.com) is the platform built by the Next.js team. It requires zero configuration.
+
+<Steps>
+  <Step title="Push your code to a Git provider">
+    Push your repository to GitHub, GitLab, or Bitbucket.
+  </Step>
+  <Step title="Import your repository on Vercel">
+    Go to [vercel.com/new](https://vercel.com/new), import your repository, and click **Deploy**. Vercel detects that you are using Next.js automatically.
+  </Step>
+  <Step title="Set environment variables">
+    In your Vercel project settings, add any environment variables from your `.env.local` that are needed in production.
+  </Step>
+</Steps>
+
+Vercel automatically handles:
+
+- Building and deploying on every push.
+- Serverless Functions for API routes and SSR pages.
+- Incremental Static Regeneration on the edge.
+- Image optimization.
+- Preview deployments for pull requests.
+
+## Deploying to a Node.js server
+
+For a self-hosted Node.js deployment:
+
+<Steps>
+  <Step title="Build the application">
+    ```bash
+    npm run build
+    ```
+
+    This generates optimized production assets in the `.next/` directory.
+  </Step>
+  <Step title="Start the production server">
+    ```bash
+    npm run start
+    ```
+
+    By default, the server listens on port 3000. Set the `PORT` environment variable to change it:
+
+    ```bash
+    PORT=8080 npm run start
+    ```
+  </Step>
+</Steps>
+
+### Keeping the server running
+
+Use a process manager like [PM2](https://pm2.keymetrics.io/) to keep your server running and restart it on crash:
+
+```bash
+npm install -g pm2
+pm2 start npm --name "my-app" -- start
+pm2 save
+pm2 startup
+```
+
+## Deploying with Docker
+
+Docker lets you package your application with its dependencies and deploy it anywhere containers run.
+
+Create a `Dockerfile` at the root of your project:
+
+```dockerfile Dockerfile
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN npm run build
+
+# Production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+ENV PORT=3000
+
+CMD ["node", "server.js"]
+```
+
+Enable standalone output in `next.config.js` so Next.js produces a self-contained `server.js` file:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'standalone',
+}
+
+module.exports = nextConfig
+```
+
+Build and run the container:
+
+```bash
+docker build -t my-next-app .
+docker run -p 3000:3000 my-next-app
+```
+
+## Static export
+
+If your application has no server-side requirements, you can export it as static HTML files. Static exports work without a Node.js server.
+
+Set `output: 'export'` in `next.config.js`:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',
+}
+
+module.exports = nextConfig
+```
+
+Then build:
+
+```bash
+npm run build
+```
+
+Next.js generates a static `out/` directory that you can deploy to any static hosting service (Nginx, Apache, S3, GitHub Pages, Cloudflare Pages, etc.).
+
+### Limitations of static export
+
+The following features are not compatible with `output: 'export'` because they require a server:
+
+- `getServerSideProps`
+- API routes (`pages/api/`)
+- Image Optimization (unless you use a custom image loader)
+- Incremental Static Regeneration
+- Internationalized routing
+
+<Warning>
+If your app uses `getServerSideProps` or API routes, you cannot use static export. Use a Node.js server or Docker deployment instead.
+</Warning>
+
+### Serving the export
+
+To serve the `out/` directory locally with Nginx:
+
+```nginx
+server {
+  listen 80;
+  root /var/www/my-app/out;
+
+  location / {
+    try_files $uri $uri.html $uri/ =404;
+  }
+}
+```
+
+## Configuring for production
+
+### Environment variables
+
+Set production environment variables on your hosting platform. Never commit `.env.local` to version control.
+
+### Caching
+
+Next.js includes an HTTP response cache. For SSR pages, you can set `Cache-Control` headers in `getServerSideProps`:
+
+```ts
+export async function getServerSideProps({ res }) {
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+  return { props: {} }
+}
+```
+
+For static pages and assets, Next.js sets immutable cache headers automatically.
+
+### Health checks
+
+Create a health check endpoint for load balancers:
+
+```ts pages/api/health.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.status(200).json({ status: 'ok' })
+}
+```
+
+<Note>
+For a full production deployment checklist, see the [Next.js production checklist](https://nextjs.org/pages/guides/production-checklist).
+</Note>

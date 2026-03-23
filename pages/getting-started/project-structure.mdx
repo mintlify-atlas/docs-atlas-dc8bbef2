@@ -1,0 +1,153 @@
+---
+title: Project structure
+description: A reference for the folder and file conventions in a Next.js Pages Router project.
+---
+
+This page covers the structure of a Next.js Pages Router project—what each top-level directory and special file does.
+
+## Top-level directories
+
+| Directory | Description |
+| --- | --- |
+| `pages/` | File-based routing. Every file is a route. |
+| `public/` | Static assets served at `/`. |
+| `styles/` | CSS files (convention, not required). |
+| `components/` | Shared React components (convention, not required). |
+| `lib/` | Shared utility functions (convention, not required). |
+
+## Top-level files
+
+| File | Description |
+| --- | --- |
+| `next.config.js` | Configuration for Next.js. |
+| `package.json` | Project dependencies and scripts. |
+| `tsconfig.json` | TypeScript configuration. |
+| `.env` | Environment variables. |
+| `.env.local` | Local environment variable overrides. |
+| `.gitignore` | Files to exclude from Git. |
+
+## The `pages/` directory
+
+The `pages/` directory is the heart of a Pages Router project. Files inside it become routes automatically.
+
+```txt
+pages/
+├── _app.tsx        # Custom App component
+├── _document.tsx   # Custom Document component
+├── _error.tsx      # Custom error page
+├── 404.tsx         # Custom 404 page
+├── 500.tsx         # Custom 500 page
+├── index.tsx       # Route: /
+├── about.tsx       # Route: /about
+├── blog/
+│   ├── index.tsx   # Route: /blog
+│   └── [slug].tsx  # Route: /blog/:slug
+└── api/
+    └── hello.ts    # API route: /api/hello
+```
+
+## Special files
+
+### `_app.tsx`
+
+Overrides the default App component. Use it to:
+
+- Wrap every page in a shared layout.
+- Inject global CSS.
+- Keep state between page navigations.
+
+```tsx pages/_app.tsx
+import type { AppProps } from 'next/app'
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />
+}
+```
+
+### `_document.tsx`
+
+Customizes the `<html>` and `<body>` tags. Rendered on the server only. Use it to:
+
+- Add a `lang` attribute to `<html>`.
+- Include third-party scripts that must load before the page.
+
+```tsx pages/_document.tsx
+import { Html, Head, Main, NextScript } from 'next/document'
+
+export default function Document() {
+  return (
+    <Html lang="en">
+      <Head />
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  )
+}
+```
+
+<Warning>
+Do not add application logic or event handlers to `_document.tsx`. It runs on the server only and is not hydrated on the client.
+</Warning>
+
+### `_error.tsx`
+
+Customizes the error page shown for unhandled errors in production. For most cases, prefer a specific `500.tsx` page instead.
+
+```tsx pages/_error.tsx
+function Error({ statusCode }: { statusCode: number }) {
+  return (
+    <p>
+      {statusCode
+        ? `An error ${statusCode} occurred on server`
+        : 'An error occurred on the client'}
+    </p>
+  )
+}
+
+Error.getInitialProps = ({ res, err }: any) => {
+  const statusCode = res ? res.statusCode : err ? err.statusCode : 404
+  return { statusCode }
+}
+
+export default Error
+```
+
+### `404.tsx` and `500.tsx`
+
+Static pages for 404 and 500 errors. Next.js generates these at build time.
+
+```tsx pages/404.tsx
+export default function Custom404() {
+  return <h1>404 - Page Not Found</h1>
+}
+```
+
+## The `public/` directory
+
+Files in `public/` are served at the root path `/`. For example, `public/logo.png` is accessible at `/logo.png`.
+
+```txt
+public/
+├── favicon.ico
+├── logo.png
+└── robots.txt
+```
+
+## The `pages/api/` directory
+
+Files inside `pages/api/` are treated as API endpoints rather than pages. They run on the server and are not included in the client-side bundle.
+
+```txt
+pages/api/
+├── hello.ts          # /api/hello
+├── users/
+│   └── [id].ts       # /api/users/:id
+└── posts/
+    └── [...slug].ts  # /api/posts/*
+```
+
+<Note>
+In the App Router, [Route Handlers](https://nextjs.org/api-reference/file-conventions/route) replace API routes and support additional features like streaming.
+</Note>

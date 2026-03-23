@@ -1,0 +1,118 @@
+---
+title: Accessibility
+description: Next.js includes built-in accessibility features including route announcements and integrated ESLint rules via eslint-plugin-jsx-a11y.
+---
+
+The Next.js team is committed to making Next.js accessible to all developers and their users. Built-in accessibility features are enabled by default, so you don't need to configure them.
+
+## Route announcements
+
+When navigating between pages in a traditional multi-page application, screen readers announce the page title on load so users know the page has changed.
+
+Next.js also supports client-side transitions via `next/link` for better performance. To ensure assistive technology is notified of these transitions, Next.js includes a **route announcer** by default — no configuration required.
+
+The route announcer determines what to announce by checking, in order:
+
+1. `document.title`
+2. The first `<h1>` element on the page
+3. The URL pathname
+
+<Tip>
+  Give each page a unique, descriptive `<title>` to ensure screen readers announce meaningful page names on navigation.
+</Tip>
+
+```tsx filename="app/about/page.tsx"
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'About us — Acme',
+}
+
+export default function AboutPage() {
+  return <h1>About us</h1>
+}
+```
+
+## Focus management
+
+During client-side navigation, Next.js manages focus to keep keyboard users oriented. After a route transition:
+
+- Focus moves to the top of the new page's content, not the browser chrome.
+- Users navigating with a keyboard or screen reader can begin reading or tabbing through the new content immediately.
+
+For custom focus handling, you can use the `useRouter` hook to listen for navigation events and manually call `.focus()` on the relevant element.
+
+## ESLint integration
+
+Next.js ships with an integrated ESLint setup that includes [`eslint-plugin-jsx-a11y`](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y). This plugin catches common accessibility mistakes at write time, warning on:
+
+| Rule | What it checks |
+|---|---|
+| `aria-props` | Valid ARIA attribute names |
+| `aria-proptypes` | Correct value types for ARIA attributes |
+| `aria-unsupported-elements` | ARIA roles on elements that don't support them |
+| `role-has-required-aria-props` | Required ARIA properties for a given role |
+| `role-supports-aria-props` | ARIA attributes allowed by the element's role |
+| `alt-text` | `alt` attribute on `<img>`, `<area>`, and `<input type="image">` |
+| `anchor-has-content` | Non-empty link text |
+| `interactive-supports-focus` | Focusability of interactive elements |
+
+Run the linter with:
+
+```bash
+next lint
+```
+
+For more details on configuring ESLint in Next.js, see the [ESLint configuration reference](/api-reference/config/eslint).
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Semantic HTML">
+    Use HTML elements for their intended purpose. A `<button>` handles keyboard events automatically; a `<div onClick>` does not.
+
+    ```tsx
+    // Prefer
+    <button onClick={handleSubmit}>Submit</button>
+
+    // Avoid
+    <div role="button" onClick={handleSubmit}>Submit</div>
+    ```
+  </Accordion>
+  <Accordion title="Color contrast">
+    Ensure sufficient contrast between foreground text and background colors. WCAG 2.2 requires a minimum contrast ratio of 4.5:1 for normal text and 3:1 for large text.
+
+    Use tools like the [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/) or browser DevTools accessibility panels to audit your palette.
+  </Accordion>
+  <Accordion title="Keyboard navigation">
+    All interactive elements must be reachable and operable via keyboard. Test your application by navigating entirely with `Tab`, `Shift+Tab`, `Enter`, and arrow keys.
+  </Accordion>
+  <Accordion title="Reduced motion">
+    Respect the user's motion preference with the `prefers-reduced-motion` media query:
+
+    ```css
+    @media (prefers-reduced-motion: reduce) {
+      .animated {
+        animation: none;
+        transition: none;
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Form labels">
+    Every form input must have an associated `<label>`. Use `htmlFor` with a matching `id`, or wrap the input inside the label.
+
+    ```tsx
+    <label htmlFor="email">Email address</label>
+    <input id="email" type="email" />
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## External resources
+
+- [WCAG 2.2 Guidelines](https://www.w3.org/TR/WCAG22/) — the international standard for web accessibility
+- [WebAIM WCAG Checklist](https://webaim.org/standards/wcag/checklist) — a practical summary of WCAG requirements
+- [The A11y Project](https://www.a11yproject.com/) — community-maintained accessibility patterns and resources
+- [MDN: Color contrast](https://developer.mozilla.org/docs/Web/Accessibility/Understanding_WCAG/Perceivable/Color_contrast) — understanding color contrast ratios
+- [web.dev: prefers-reduced-motion](https://web.dev/prefers-reduced-motion/) — building motion-safe animations

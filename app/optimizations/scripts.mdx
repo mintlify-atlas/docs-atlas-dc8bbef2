@@ -1,0 +1,275 @@
+---
+title: Scripts
+description: Optimize third-party scripts in your Next.js application with the next/script component.
+---
+
+The `next/script` component lets you load and manage third-party scripts with built-in loading strategies that optimize performance.
+
+## Basic usage
+
+Import `Script` from `next/script` and add it to any layout or page:
+
+<CodeGroup>
+
+```tsx app/layout.tsx
+import Script from 'next/script'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+      <Script src="https://example.com/script.js" />
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import Script from 'next/script'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+      <Script src="https://example.com/script.js" />
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+## Loading strategies
+
+The `strategy` prop controls when the script loads relative to the page lifecycle.
+
+<AccordionGroup>
+  <Accordion title="afterInteractive (default)">
+    Loads the script after the page becomes interactive. This is the default and is suitable for most third-party scripts that don't need to run before the page is usable.
+
+    ```tsx app/page.tsx
+    import Script from 'next/script'
+
+    export default function Page() {
+      return (
+        <>
+          <Script
+            src="https://example.com/script.js"
+            strategy="afterInteractive"
+          />
+        </>
+      )
+    }
+    ```
+
+    **Use for:** Analytics, tag managers, chatbots.
+  </Accordion>
+
+  <Accordion title="lazyOnload">
+    Loads the script during browser idle time, after all page resources have been fetched. Use for scripts that don't need to load early.
+
+    ```tsx app/page.tsx
+    import Script from 'next/script'
+
+    export default function Page() {
+      return (
+        <>
+          <Script
+            src="https://example.com/script.js"
+            strategy="lazyOnload"
+          />
+        </>
+      )
+    }
+    ```
+
+    **Use for:** Low-priority scripts, social share buttons, feedback widgets.
+  </Accordion>
+
+  <Accordion title="beforeInteractive">
+    Loads the script before any Next.js code and before page hydration. This strategy must be placed in the root layout (`app/layout`).
+
+    ```tsx app/layout.tsx
+    import Script from 'next/script'
+
+    export default function RootLayout({
+      children,
+    }: {
+      children: React.ReactNode
+    }) {
+      return (
+        <html lang="en">
+          <body>{children}</body>
+          <Script
+            src="https://example.com/script.js"
+            strategy="beforeInteractive"
+          />
+        </html>
+      )
+    }
+    ```
+
+    **Use for:** Bot detection scripts, consent managers, polyfills that must run before any other code.
+
+    <Warning>
+    `beforeInteractive` blocks the page from becoming interactive until the script loads. Only use it for scripts that are truly critical before hydration.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="worker (experimental)">
+    Loads the script in a web worker using [Partytown](https://partytown.builder.io/). This offloads heavy third-party scripts from the main thread.
+
+    Enable the feature first in `next.config.js`:
+
+    ```js next.config.js
+    /** @type {import('next').NextConfig} */
+    const nextConfig = {
+      experimental: {
+        nextScriptWorkers: true,
+      },
+    }
+
+    module.exports = nextConfig
+    ```
+
+    ```tsx app/page.tsx
+    import Script from 'next/script'
+
+    export default function Page() {
+      return (
+        <Script
+          src="https://example.com/script.js"
+          strategy="worker"
+        />
+      )
+    }
+    ```
+
+    **Use for:** Analytics, ad scripts, and other heavy third-party scripts you want off the main thread.
+  </Accordion>
+</AccordionGroup>
+
+## Inline scripts
+
+For small inline scripts, use the `Script` component with either a string or JSX children:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      {/* Inline script with dangerouslySetInnerHTML */}
+      <Script
+        id="inline-script"
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+          `,
+        }}
+      />
+
+      {/* Inline script as JSX children */}
+      <Script id="another-script">
+        {`console.log('Hello from inline script')`}
+      </Script>
+    </>
+  )
+}
+```
+
+```jsx app/page.js
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      <Script
+        id="inline-script"
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+          `,
+        }}
+      />
+    </>
+  )
+}
+```
+
+</CodeGroup>
+
+<Note>
+Inline scripts require a unique `id` prop so Next.js can track and optimize them.
+</Note>
+
+## Event handlers
+
+Use event handler props to execute code at different points of the script lifecycle:
+
+<ParamField path="onLoad" type="function">
+  Fires once when the script has finished loading. Cannot be used with `beforeInteractive`.
+
+  ```tsx
+  <Script
+    src="https://example.com/script.js"
+    onLoad={() => {
+      console.log('Script loaded')
+    }}
+  />
+  ```
+</ParamField>
+
+<ParamField path="onReady" type="function">
+  Fires after the script loads and every time the component mounts. Useful for re-running script initialization when navigating between pages.
+
+  ```tsx
+  <Script
+    src="https://example.com/script.js"
+    onReady={() => {
+      // Re-initialize widget after each navigation
+    }}
+  />
+  ```
+</ParamField>
+
+<ParamField path="onError" type="function">
+  Fires when the script fails to load. Cannot be used with `beforeInteractive`.
+
+  ```tsx
+  <Script
+    src="https://example.com/script.js"
+    onError={(e) => {
+      console.error('Script failed to load', e)
+    }}
+  />
+  ```
+</ParamField>
+
+## Props reference
+
+<ParamField path="src" type="string">
+  URL of the external script. Required unless `dangerouslySetInnerHTML` or children are used.
+</ParamField>
+
+<ParamField path="strategy" type="string" default="'afterInteractive'">
+  The loading strategy. One of `'beforeInteractive'`, `'afterInteractive'`, `'lazyOnload'`, or `'worker'`.
+</ParamField>
+
+<ParamField path="id" type="string">
+  Required for inline scripts (those using `dangerouslySetInnerHTML` or children).
+</ParamField>
+
+<ParamField path="nonce" type="string">
+  A cryptographic nonce for Content Security Policy support.
+</ParamField>

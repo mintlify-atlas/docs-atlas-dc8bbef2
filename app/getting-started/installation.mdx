@@ -1,0 +1,365 @@
+---
+title: Installation
+description: Create a new Next.js application with create-next-app, or set it up manually. Covers system requirements, TypeScript, ESLint, and module path aliases.
+---
+
+Create a new Next.js app and run it locally.
+
+## System requirements
+
+Before you begin, make sure your development environment meets the following requirements:
+
+- **Node.js** version 20.9 or later — [nodejs.org](https://nodejs.org/)
+- **Operating system**: macOS, Windows (including WSL), or Linux.
+
+### Supported browsers
+
+Next.js supports modern browsers with zero configuration:
+
+| Browser | Minimum version |
+| ------- | --------------- |
+| Chrome  | 111+            |
+| Edge    | 111+            |
+| Firefox | 111+            |
+| Safari  | 16.4+           |
+
+## Quick start
+
+<Tabs>
+  <Tab title="pnpm">
+    ```bash
+    pnpm create next-app@latest my-app --yes
+    cd my-app
+    pnpm dev
+    ```
+  </Tab>
+  <Tab title="npm">
+    ```bash
+    npx create-next-app@latest my-app --yes
+    cd my-app
+    npm run dev
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn create next-app@latest my-app --yes
+    cd my-app
+    yarn dev
+    ```
+  </Tab>
+  <Tab title="bun">
+    ```bash
+    bun create next-app@latest my-app --yes
+    cd my-app
+    bun dev
+    ```
+  </Tab>
+</Tabs>
+
+Then visit `http://localhost:3000`.
+
+<Note>
+  `--yes` skips the interactive prompts, using saved preferences or defaults. The default setup enables TypeScript, Tailwind CSS, ESLint, App Router, and Turbopack, with import alias `@/*`, and includes `AGENTS.md` (with a `CLAUDE.md` symlink) to guide coding agents to write up-to-date Next.js code.
+</Note>
+
+## Create with the CLI
+
+To create a project interactively, run `create-next-app` without `--yes`:
+
+<Tabs>
+  <Tab title="pnpm">
+    ```bash
+    pnpm create next-app
+    ```
+  </Tab>
+  <Tab title="npm">
+    ```bash
+    npx create-next-app@latest
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn create next-app
+    ```
+  </Tab>
+  <Tab title="bun">
+    ```bash
+    bun create next-app
+    ```
+  </Tab>
+</Tabs>
+
+On installation, you'll see the following prompts:
+
+```txt
+What is your project named? my-app
+Would you like to use the recommended Next.js defaults?
+    Yes, use recommended defaults - TypeScript, ESLint, Tailwind CSS, App Router, AGENTS.md
+    No, reuse previous settings
+    No, customize settings - Choose your own preferences
+```
+
+If you choose **customize settings**, you'll be asked:
+
+```txt
+Would you like to use TypeScript? No / Yes
+Which linter would you like to use? ESLint / Biome / None
+Would you like to use React Compiler? No / Yes
+Would you like to use Tailwind CSS? No / Yes
+Would you like your code inside a `src/` directory? No / Yes
+Would you like to use App Router? (recommended) No / Yes
+Would you like to customize the import alias (`@/*` by default)? No / Yes
+What import alias would you like configured? @/*
+Would you like to include AGENTS.md to guide coding agents? No / Yes
+```
+
+### CLI flags
+
+You can pass flags to skip prompts entirely:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--ts`, `--typescript` | Initialize as a TypeScript project (default) |
+| `--js`, `--javascript` | Initialize as a JavaScript project |
+| `--tailwind` | Add Tailwind CSS config (default) |
+| `--eslint` | Add ESLint config |
+| `--biome` | Add Biome config |
+| `--react-compiler` | Enable the React Compiler |
+| `--app` | Use the App Router (default) |
+| `--src-dir` | Place source files inside a `src/` directory |
+| `--import-alias <prefix/*>` | Set a custom import alias (default `@/*`) |
+| `--empty` | Initialize an empty project |
+| `--api` | Initialize a headless API using the App Router |
+| `--use-npm` / `--use-pnpm` / `--use-yarn` / `--use-bun` | Choose a package manager |
+| `--skip-install` | Skip installing packages |
+| `--disable-git` | Skip initializing a git repository |
+| `--yes` | Accept saved preferences or defaults for all prompts |
+| `-e`, `--example <name\|url>` | Bootstrap from an official example or GitHub URL |
+
+## Manual installation
+
+If you prefer to set things up yourself, install the required packages:
+
+<Tabs>
+  <Tab title="pnpm">
+    ```bash
+    pnpm i next@latest react@latest react-dom@latest
+    ```
+  </Tab>
+  <Tab title="npm">
+    ```bash
+    npm i next@latest react@latest react-dom@latest
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add next@latest react@latest react-dom@latest
+    ```
+  </Tab>
+  <Tab title="bun">
+    ```bash
+    bun add next@latest react@latest react-dom@latest
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The App Router uses React canary releases built-in, which include all stable React 19 changes plus newer features being validated in frameworks. You should still declare `react` and `react-dom` in `package.json` for tooling and ecosystem compatibility.
+</Note>
+
+Add the following scripts to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
+  }
+}
+```
+
+| Script | Description |
+| ------ | ----------- |
+| `next dev` | Starts the development server with Turbopack (default bundler) |
+| `next build` | Builds the application for production |
+| `next start` | Starts the production server |
+| `eslint` | Runs ESLint |
+
+<Tip>
+  Turbopack is the default bundler. To use Webpack instead, run `next dev --webpack` or `next build --webpack`.
+</Tip>
+
+### Create the `app` directory
+
+Next.js uses file-system routing — routes are determined by how you structure your files.
+
+<Steps>
+  <Step title="Create the root layout">
+    Create an `app/` folder, then add `app/layout.tsx` inside it. This is the **root layout** and is required. It must contain `<html>` and `<body>` tags.
+
+    <CodeGroup>
+      ```tsx app/layout.tsx
+      export default function RootLayout({
+        children,
+      }: {
+        children: React.ReactNode
+      }) {
+        return (
+          <html lang="en">
+            <body>{children}</body>
+          </html>
+        )
+      }
+      ```
+
+      ```jsx app/layout.js
+      export default function RootLayout({ children }) {
+        return (
+          <html lang="en">
+            <body>{children}</body>
+          </html>
+        )
+      }
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create the home page">
+    Add `app/page.tsx` with some initial content:
+
+    <CodeGroup>
+      ```tsx app/page.tsx
+      export default function Page() {
+        return <h1>Hello, Next.js!</h1>
+      }
+      ```
+
+      ```jsx app/page.js
+      export default function Page() {
+        return <h1>Hello, Next.js!</h1>
+      }
+      ```
+    </CodeGroup>
+
+    Both `layout.tsx` and `page.tsx` are rendered when a user visits `/`.
+  </Step>
+
+  <Step title="Create the public folder (optional)">
+    Create a `public/` folder at the root of your project to store static assets such as images and fonts. Files inside `public` can be referenced from your code starting from the base URL (`/`).
+
+    ```tsx
+    import Image from 'next/image'
+
+    export default function Page() {
+      return <Image src="/profile.png" alt="Profile" width={100} height={100} />
+    }
+    ```
+  </Step>
+</Steps>
+
+## Set up TypeScript
+
+<Note>
+  Minimum TypeScript version: `v5.1.0`
+</Note>
+
+Next.js has built-in TypeScript support. To add TypeScript to an existing project, rename a file to `.ts` or `.tsx` and run `next dev`. Next.js will automatically install the necessary dependencies and add a `tsconfig.json` file with the recommended configuration.
+
+### IDE plugin
+
+Next.js includes a custom TypeScript plugin and type checker that VSCode and other editors can use for advanced type-checking and auto-completion.
+
+To enable the plugin in VS Code:
+
+<Steps>
+  <Step title="Open the command palette">
+    Press `Ctrl/⌘ + Shift + P`.
+  </Step>
+  <Step title="Select the TypeScript version">
+    Search for **TypeScript: Select TypeScript Version** and select **Use Workspace Version**.
+  </Step>
+</Steps>
+
+## Set up linting
+
+Next.js supports linting with ESLint or Biome.
+
+<Tabs>
+  <Tab title="ESLint">
+    ESLint provides comprehensive rules. Add lint scripts to `package.json`:
+
+    ```json
+    {
+      "scripts": {
+        "lint": "eslint",
+        "lint:fix": "eslint --fix"
+      }
+    }
+    ```
+
+    Create an explicit config file (the recommended format is `eslint.config.mjs`). See the [ESLint config reference](/api-reference/config/eslint) for a recommended setup.
+  </Tab>
+  <Tab title="Biome">
+    Biome is a fast linter and formatter. Add lint scripts to `package.json`:
+
+    ```json
+    {
+      "scripts": {
+        "lint": "biome check",
+        "format": "biome format --write"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  Starting with Next.js 16, `next build` no longer runs the linter automatically. Run your linter through npm scripts instead.
+</Note>
+
+If your project previously used `next lint`, migrate to the ESLint CLI with the codemod:
+
+```bash
+npx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+## Set up absolute imports and module path aliases
+
+Next.js has built-in support for the `paths` and `baseUrl` options in `tsconfig.json` and `jsconfig.json`. These let you alias project directories to absolute paths, making imports cleaner.
+
+```tsx
+// Before
+import { Button } from '../../../components/button'
+
+// After
+import { Button } from '@/components/button'
+```
+
+To configure absolute imports, add `baseUrl` to your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": "src/"
+  }
+}
+```
+
+To configure path aliases, add a `paths` entry:
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": "src/",
+    "paths": {
+      "@/styles/*": ["styles/*"],
+      "@/components/*": ["components/*"]
+    }
+  }
+}
+```
+
+Each path in `paths` is relative to the `baseUrl` location.

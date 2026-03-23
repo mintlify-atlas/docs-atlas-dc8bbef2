@@ -1,0 +1,263 @@
+---
+title: Forms
+description: Learn how to handle form submissions with Server Actions, add validation, display errors, manage pending states, and implement optimistic updates in Next.js.
+---
+
+React Server Actions are server functions that handle form submissions in Next.js. They receive `FormData` automatically when used as a form `action`.
+
+<Warning>
+  Always verify [authentication and authorization](/app/guides/authentication) inside each Server Action, even if the form is rendered only on an authenticated page.
+</Warning>
+
+## Basic form submission
+
+Define a Server Action inline in a Server Component:
+
+```tsx filename="app/invoices/page.tsx"
+import { auth } from '@/lib/auth'
+
+export default function Page() {
+  async function createInvoice(formData: FormData) {
+    'use server'
+
+    const session = await auth()
+    if (!session?.user) throw new Error('Unauthorized')
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // mutate data
+    // revalidate the cache
+  }
+
+  return <form action={createInvoice}>...</form>
+}
+```
+
+<Note>
+  For forms with many fields, use `Object.fromEntries(formData)` to extract all values at once.
+</Note>
+
+## Passing additional arguments
+
+Use JavaScript's `bind` to pass additional arguments to a Server Action:
+
+```tsx filename="app/client-component.tsx"
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }: { userId: string }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">Update User Name</button>
+    </form>
+  )
+}
+```
+
+```ts filename="app/actions.ts"
+'use server'
+
+export async function updateUser(userId: string, formData: FormData) {}
+```
+
+`bind` works in both Server and Client Components and supports progressive enhancement.
+
+## Form validation
+
+<Tabs>
+  <Tab title="Client-side">
+    Use HTML attributes for basic validation:
+
+    ```tsx
+    <input type="email" name="email" required />
+    <input type="text" name="name" minLength={2} />
+    ```
+  </Tab>
+  <Tab title="Server-side">
+    Use Zod for comprehensive server-side validation:
+
+    ```ts filename="app/actions.ts"
+    'use server'
+
+    import { z } from 'zod'
+
+    const schema = z.object({
+      email: z.string({
+        invalid_type_error: 'Invalid Email',
+      }),
+    })
+
+    export default async function createUser(formData: FormData) {
+      const validatedFields = schema.safeParse({
+        email: formData.get('email'),
+      })
+
+      if (!validatedFields.success) {
+        return {
+          errors: validatedFields.error.flatten().fieldErrors,
+        }
+      }
+
+      // Mutate data
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Validation errors and pending states
+
+Use `useActionState` to display validation errors and track pending state in a Client Component:
+
+```ts filename="app/actions.ts"
+'use server'
+
+import { z } from 'zod'
+
+export async function createUser(initialState: any, formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+  // ...
+}
+```
+
+```tsx filename="app/ui/signup.tsx"
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = { message: '' }
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">Email</label>
+      <input type="text" id="email" name="email" required />
+      <p aria-live="polite">{state?.message}</p>
+      <button disabled={pending}>Sign up</button>
+    </form>
+  )
+}
+```
+
+### Submit button with `useFormStatus`
+
+For a reusable submit button component, use `useFormStatus`:
+
+```tsx filename="app/ui/button.tsx"
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button disabled={pending} type="submit">
+      Sign Up
+    </button>
+  )
+}
+```
+
+```tsx filename="app/ui/signup.tsx"
+import { SubmitButton } from './button'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  return (
+    <form action={createUser}>
+      {/* Other form elements */}
+      <SubmitButton />
+    </form>
+  )
+}
+```
+
+<Note>
+  In React 19, `useFormStatus` returns additional keys: `data`, `method`, and `action`. In earlier versions, only `pending` is available.
+</Note>
+
+## Optimistic updates
+
+Use `useOptimistic` to update the UI immediately before the server responds:
+
+```tsx filename="app/page.tsx"
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+type Message = { message: string }
+
+export function Thread({ messages }: { messages: Message[] }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<Message[], string>(
+    messages,
+    (state, newMessage) => [...state, { message: newMessage }]
+  )
+
+  const formAction = async (formData: FormData) => {
+    const message = formData.get('message') as string
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m, i) => (
+        <div key={i}>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  )
+}
+```
+
+## Nested form elements
+
+Call Server Actions from nested `<button>`, `<input type="submit">`, and `<input type="image">` elements using the `formAction` prop. This allows multiple actions within a single form:
+
+```tsx
+<form action={saveDraft}>
+  <input type="text" name="content" />
+  <button type="submit">Save Draft</button>
+  <button formAction={publishPost} type="submit">Publish</button>
+</form>
+```
+
+## Programmatic submission
+
+Trigger form submission programmatically using `requestSubmit()`:
+
+```tsx filename="app/entry.tsx"
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === 'NumpadEnter')) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <div>
+      <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+    </div>
+  )
+}
+```

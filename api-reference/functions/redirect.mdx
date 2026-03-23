@@ -1,0 +1,148 @@
+---
+title: redirect
+description: API reference for the redirect() and permanentRedirect() functions used to navigate users to a different URL.
+---
+
+The `redirect` function lets you redirect the user to another URL. It can be used in [Server Components](/app/getting-started/server-and-client-components), [Route Handlers](/api-reference/file-conventions/route), and [Server Functions](/app/getting-started/mutating-data).
+
+## `redirect()`
+
+```typescript
+import { redirect } from 'next/navigation'
+
+redirect(path, type?)
+```
+
+Issues a **307 Temporary Redirect** (or a `meta` redirect when used inside a streaming context). In Server Actions it issues a **303 See Other**.
+
+### Parameters
+
+<ParamField path="path" type="string" required>
+  The URL to redirect to. Can be a relative or absolute path.
+</ParamField>
+
+<ParamField path="type" type="'replace' | 'push'">
+  The redirect type. Defaults to `'push'` in Server Actions and `'replace'` everywhere else.
+</ParamField>
+
+You can use the `RedirectType` enum for the `type` parameter:
+
+```typescript
+import { redirect, RedirectType } from 'next/navigation'
+
+redirect('/new-page', RedirectType.replace)
+redirect('/new-page', RedirectType.push)
+```
+
+<Note>
+  The `type` parameter has no effect in Server Components.
+</Note>
+
+### Returns
+
+`redirect` does not return a value. It throws a `NEXT_REDIRECT` error internally, so it does **not** need `return redirect(...)` — the TypeScript type is `never`.
+
+## `permanentRedirect()`
+
+```typescript
+import { permanentRedirect } from 'next/navigation'
+
+permanentRedirect(path, type?)
+```
+
+Identical to `redirect` but issues a **308 Permanent Redirect** instead of 307.
+
+## Behavior
+
+- In Server Actions and Route Handlers, call `redirect` **outside** any `try/catch` block, since it works by throwing an error.
+- `redirect` can be called in Client Components **during rendering**, but not inside event handlers. Use [`useRouter`](/api-reference/functions/use-router) for event-driven navigation.
+- `redirect` accepts absolute URLs for external redirects.
+- To redirect before rendering, use [`redirects` in `next.config.js`](/app/guides/redirecting#redirects-in-nextconfigjs).
+
+### Why 307 and 308?
+
+Traditional `302` and `301` redirects caused browsers to downgrade `POST` requests to `GET`. Using `307` (temporary) and `308` (permanent) preserves the original HTTP method.
+
+## Examples
+
+### Server Component
+
+```typescript app/team/[id]/page.tsx
+import { redirect } from 'next/navigation'
+
+async function fetchTeam(id: string) {
+  const res = await fetch(`https://api.example.com/teams/${id}`)
+  if (!res.ok) return undefined
+  return res.json()
+}
+
+export default async function Profile({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const team = await fetchTeam(id)
+
+  if (!team) {
+    redirect('/login')
+  }
+
+  return <div>{team.name}</div>
+}
+```
+
+### Client Component (during render)
+
+```typescript components/client-redirect.tsx
+'use client'
+
+import { redirect, usePathname } from 'next/navigation'
+
+export function ClientRedirect() {
+  const pathname = usePathname()
+
+  if (pathname.startsWith('/admin') && !pathname.includes('/login')) {
+    redirect('/admin/login')
+  }
+
+  return <div>Admin area</div>
+}
+```
+
+<Note>
+  When used in a Client Component during initial SSR, this performs a server-side redirect.
+</Note>
+
+### Via a Server Action
+
+```typescript app/actions.ts
+'use server'
+
+import { redirect } from 'next/navigation'
+
+export async function navigate(data: FormData) {
+  redirect(`/posts/${data.get('id')}`)
+}
+```
+
+```typescript app/client-form.tsx
+'use client'
+
+import { navigate } from './actions'
+
+export function ClientForm() {
+  return (
+    <form action={navigate}>
+      <input type="text" name="id" />
+      <button>Go to post</button>
+    </form>
+  )
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.0.0` | `redirect` introduced. |

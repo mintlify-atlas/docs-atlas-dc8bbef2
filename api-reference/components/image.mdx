@@ -1,0 +1,436 @@
+---
+title: "<Image>"
+description: "Optimize images in your Next.js application using the built-in next/image component with automatic format conversion, resizing, and lazy loading."
+---
+
+The `<Image>` component extends the HTML `<img>` element with automatic image optimization, including resizing, format conversion (WebP/AVIF), and lazy loading.
+
+```jsx app/page.js
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="/profile.png"
+      width={500}
+      height={500}
+      alt="Picture of the author"
+    />
+  )
+}
+```
+
+## Props
+
+<ParamField path="src" type="string" required>
+  The source of the image. Accepts:
+  - An internal path string: `"/profile.png"`
+  - An absolute external URL (must be configured with `remotePatterns`): `"https://example.com/image.png"`
+  - A static import: `import profile from './profile.png'`
+
+  <Note>The default loader does not forward request headers when fetching `src`. If your image requires authentication, use `unoptimized` to bypass optimization.</Note>
+</ParamField>
+
+<ParamField path="alt" type="string" required>
+  Describes the image for screen readers and search engines. Also shown as fallback text if the image fails to load.
+
+  The text should replace the image without changing the meaning of the page. It does not supplement captions. For purely decorative images, use an empty string: `alt=""`.
+</ParamField>
+
+<ParamField path="width" type="number">
+  The intrinsic width of the image in pixels. Used to infer the aspect ratio and prevent layout shift. Does not determine the rendered size — use CSS for that.
+
+  Required unless the image is statically imported or has `fill={true}`.
+</ParamField>
+
+<ParamField path="height" type="number">
+  The intrinsic height of the image in pixels. Used to infer the aspect ratio and prevent layout shift. Does not determine the rendered size — use CSS for that.
+
+  Required unless the image is statically imported or has `fill={true}`.
+</ParamField>
+
+<ParamField path="fill" type="boolean" default="false">
+  Expands the image to fill its parent element. The parent must have `position: relative`, `fixed`, or `absolute`. The `<img>` element defaults to `position: absolute`.
+
+  Use `objectFit` to control how the image fills the container:
+  - `"contain"` — scales down to fit while preserving aspect ratio
+  - `"cover"` — fills and crops the container
+</ParamField>
+
+<ParamField path="sizes" type="string">
+  A string that maps viewport widths to image sizes, used by the browser to select the best `srcset` entry.
+
+  ```jsx
+  <Image
+    fill
+    src="/example.png"
+    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+  />
+  ```
+
+  Use `sizes` when:
+  - The image uses the `fill` prop
+  - CSS makes the image responsive
+
+  Without `sizes`, the browser assumes the image is full viewport width and may download unnecessarily large images.
+</ParamField>
+
+<ParamField path="quality" type="number" default="75">
+  Image quality from `1` to `100`. Higher values increase file size. Must match a value in the `qualities` config array (required in Next.js 16+).
+</ParamField>
+
+<ParamField path="preload" type="boolean" default="false">
+  When `true`, inserts a `<link rel="preload">` in the `<head>` to fetch the image early.
+
+  Use for LCP (Largest Contentful Paint) images, such as hero images above the fold. Do not combine with `loading` or `fetchPriority`.
+
+  <Note>Added in Next.js 16. Replaces the deprecated `priority` prop.</Note>
+</ParamField>
+
+<ParamField path="loading" type="string" default="lazy">
+  Controls when the image loads:
+  - `"lazy"` — defers loading until near the viewport
+  - `"eager"` — loads immediately regardless of position
+</ParamField>
+
+<ParamField path="placeholder" type="string" default="empty">
+  Placeholder shown while the image loads:
+  - `"empty"` — no placeholder
+  - `"blur"` — blurred version; requires `blurDataURL`
+  - `"data:image/..."` — a Data URL used directly as the placeholder
+</ParamField>
+
+<ParamField path="blurDataURL" type="string">
+  A Data URL used as a blur-up placeholder when `placeholder="blur"`. Should be a very small image (10px or less) — it is enlarged and blurred automatically.
+
+  Automatically set for statically imported `jpg`, `png`, `webp`, and `avif` images (unless animated). For dynamic or remote images, provide this manually.
+</ParamField>
+
+<ParamField path="style" type="object">
+  Inline CSS styles passed to the underlying `<img>` element.
+
+  ```jsx
+  <Image
+    src="/profile.png"
+    alt="Profile"
+    style={{ borderRadius: '50%', width: '100px', height: 'auto' }}
+  />
+  ```
+
+  If you set a custom `width` via `style`, also set `height: 'auto'` to preserve the aspect ratio.
+</ParamField>
+
+<ParamField path="loader" type="function">
+  A custom function to generate image URLs. Receives `{ src, width, quality }` and returns a URL string.
+
+  ```jsx
+  'use client'
+
+  const imageLoader = ({ src, width, quality }) => {
+    return `https://example.com/${src}?w=${width}&q=${quality || 75}`
+  }
+
+  export default function Page() {
+    return (
+      <Image loader={imageLoader} src="me.png" alt="Me" width={500} height={500} />
+    )
+  }
+  ```
+
+  <Note>Props that accept functions, like `loader`, require a Client Component.</Note>
+</ParamField>
+
+<ParamField path="unoptimized" type="boolean" default="false">
+  When `true`, serves the image as-is from `src` without changing quality, size, or format. Useful for small images, SVGs, and animated GIFs.
+</ParamField>
+
+<ParamField path="overrideSrc" type="string">
+  Overrides the `src` attribute on the rendered `<img>` element while keeping the generated `srcset`. Useful when migrating from `<img>` to `<Image>` and needing to preserve the original URL for SEO.
+</ParamField>
+
+<ParamField path="decoding" type="string" default="async">
+  Hint to the browser for image decoding strategy:
+  - `"async"` — decode asynchronously; other content renders first
+  - `"sync"` — decode synchronously for atomic presentation
+  - `"auto"` — browser chooses
+</ParamField>
+
+<ParamField path="onLoad" type="function">
+  Callback invoked when the image finishes loading and the placeholder is removed. Receives the native event with `event.target` pointing to the `<img>` element.
+
+  <Note>Requires a Client Component.</Note>
+</ParamField>
+
+<ParamField path="onError" type="function">
+  Callback invoked if the image fails to load.
+
+  <Note>Requires a Client Component.</Note>
+</ParamField>
+
+### Deprecated props
+
+<ParamField path="priority" type="boolean" deprecated>
+  Deprecated in Next.js 16. Use [`preload`](#preload) instead.
+</ParamField>
+
+<ParamField path="onLoadingComplete" type="function" deprecated>
+  Deprecated in Next.js 14. Use [`onLoad`](#onload) instead.
+</ParamField>
+
+## Configuration
+
+You can configure image behavior globally in `next.config.js` under the `images` key.
+
+### `remotePatterns`
+
+Defines allowed remote image sources. Any image from a URL not matching these patterns returns a `400` error.
+
+```js next.config.js
+module.exports = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 's3.amazonaws.com',
+        port: '',
+        pathname: '/my-bucket/**',
+        search: '',
+      },
+    ],
+  },
+}
+```
+
+Alternatively, use a `URL` object shorthand:
+
+```js next.config.js
+module.exports = {
+  images: {
+    remotePatterns: [new URL('https://example.com/account123/**')],
+  },
+}
+```
+
+Wildcard patterns:
+- `*` matches a single path segment or subdomain
+- `**` matches any number of path segments at the end, or subdomains at the beginning
+
+### `localPatterns`
+
+Restricts which local paths can be optimized.
+
+```js next.config.js
+module.exports = {
+  images: {
+    localPatterns: [
+      {
+        pathname: '/assets/images/**',
+        search: '',
+      },
+    ],
+  },
+}
+```
+
+### `formats`
+
+Output image formats in preference order. Defaults to `['image/webp']`.
+
+```js next.config.js
+// Enable AVIF with WebP fallback
+module.exports = {
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
+}
+```
+
+### `deviceSizes`
+
+Device width breakpoints used to generate responsive `srcset` entries.
+
+```js next.config.js
+module.exports = {
+  images: {
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+  },
+}
+```
+
+### `imageSizes`
+
+Additional image widths concatenated with `deviceSizes` for images that use the `sizes` prop.
+
+```js next.config.js
+module.exports = {
+  images: {
+    imageSizes: [32, 48, 64, 96, 128, 256, 384],
+  },
+}
+```
+
+### `qualities`
+
+Allowlist of permitted quality values. Required in Next.js 16+.
+
+```js next.config.js
+module.exports = {
+  images: {
+    qualities: [25, 50, 75, 100],
+  },
+}
+```
+
+### `minimumCacheTTL`
+
+Time-to-live (in seconds) for cached optimized images. Defaults to `14400` (4 hours).
+
+```js next.config.js
+module.exports = {
+  images: {
+    minimumCacheTTL: 2678400, // 31 days
+  },
+}
+```
+
+### `loaderFile`
+
+Path to a custom image optimization loader, relative to the project root.
+
+```js next.config.js
+module.exports = {
+  images: {
+    loader: 'custom',
+    loaderFile: './my/image/loader.js',
+  },
+}
+```
+
+## `getImageProps`
+
+Returns the props that `<Image>` would pass to the underlying `<img>` element without rendering the component. Useful for art direction, background images, and canvas.
+
+```jsx app/page.js
+import { getImageProps } from 'next/image'
+
+export default function Home() {
+  const common = { alt: 'Art direction example', sizes: '100vw' }
+  const { props: { srcSet: desktop } } = getImageProps({
+    ...common, width: 1440, height: 875, quality: 80, src: '/desktop.jpg',
+  })
+  const { props: { srcSet: mobile, ...rest } } = getImageProps({
+    ...common, width: 750, height: 1334, quality: 70, src: '/mobile.jpg',
+  })
+
+  return (
+    <picture>
+      <source media="(min-width: 1000px)" srcSet={desktop} />
+      <source media="(min-width: 500px)" srcSet={mobile} />
+      <img {...rest} style={{ width: '100%', height: 'auto' }} />
+    </picture>
+  )
+}
+```
+
+## Examples
+
+### Local image
+
+Statically imported images have their `width` and `height` inferred automatically.
+
+```jsx app/page.js
+import Image from 'next/image'
+import mountains from '../public/mountains.jpg'
+
+export default function Page() {
+  return (
+    <Image
+      src={mountains}
+      alt="Mountains"
+      sizes="100vw"
+      style={{ width: '100%', height: 'auto' }}
+    />
+  )
+}
+```
+
+### Remote image
+
+Provide `width` and `height` explicitly since Next.js cannot inspect remote files at build time.
+
+```jsx app/page.js
+import Image from 'next/image'
+
+export default function Page({ photoUrl }) {
+  return (
+    <Image
+      src={photoUrl}
+      alt="Photo"
+      sizes="100vw"
+      style={{ width: '100%', height: 'auto' }}
+      width={500}
+      height={300}
+    />
+  )
+}
+```
+
+### Fill layout
+
+Use `fill` when the image dimensions are unknown. The parent container must be positioned.
+
+```jsx
+<div style={{ position: 'relative', width: '400px', height: '300px' }}>
+  <Image
+    src="/photo.jpg"
+    alt="Photo"
+    fill
+    sizes="(min-width: 808px) 50vw, 100vw"
+    style={{ objectFit: 'cover' }}
+  />
+</div>
+```
+
+### Blur placeholder
+
+```jsx
+<Image
+  src="/hero.jpg"
+  alt="Hero"
+  width={1200}
+  height={600}
+  placeholder="blur"
+  blurDataURL="data:image/jpeg;base64,..."
+/>
+```
+
+For statically imported local images, `blurDataURL` is set automatically.
+
+### Background image
+
+```jsx app/page.js
+import Image from 'next/image'
+import mountains from '../public/mountains.jpg'
+
+export default function Background() {
+  return (
+    <Image
+      alt="Mountains"
+      src={mountains}
+      placeholder="blur"
+      quality={100}
+      fill
+      sizes="100vw"
+      style={{ objectFit: 'cover' }}
+    />
+  )
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v16.0.0` | `preload` prop added, `priority` deprecated, `qualities` default changed to `[75]` |
+| `v14.0.0` | `onLoadingComplete` deprecated |
+| `v13.0.0` | `next/image` stable, `next/legacy/image` renamed |

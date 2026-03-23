@@ -1,0 +1,236 @@
+---
+title: ESLint
+description: Next.js provides an ESLint configuration package that catches common issues and enforces best practices in your application.
+---
+
+Next.js provides [`eslint-config-next`](https://www.npmjs.com/package/eslint-config-next), a shareable ESLint configuration that bundles recommended rule-sets for React, React Hooks, and Next.js-specific patterns.
+
+<Note>
+`next lint` and the `eslint` option in `next.config.js` were removed in Next.js 16. Use the ESLint CLI directly.
+</Note>
+
+## Configurations
+
+Three configurations are available:
+
+| Config | Description |
+|---|---|
+| `eslint-config-next` | Base config with Next.js, React, and React Hooks rules |
+| `eslint-config-next/core-web-vitals` | Upgrades rules that affect Core Web Vitals from warnings to errors (recommended) |
+| `eslint-config-next/typescript` | Adds TypeScript-specific rules from `typescript-eslint` |
+
+## Setup
+
+<Steps>
+  <Step title="Install ESLint and the config package">
+
+<Tabs>
+  <Tab title="pnpm">
+```bash
+pnpm add -D eslint eslint-config-next
+```
+  </Tab>
+  <Tab title="npm">
+```bash
+npm i -D eslint eslint-config-next
+```
+  </Tab>
+  <Tab title="yarn">
+```bash
+yarn add --dev eslint eslint-config-next
+```
+  </Tab>
+  <Tab title="bun">
+```bash
+bun add -d eslint eslint-config-next
+```
+  </Tab>
+</Tabs>
+
+  </Step>
+  <Step title="Create eslint.config.mjs">
+
+```js eslint.config.mjs
+import { defineConfig, globalIgnores } from 'eslint/config'
+import nextVitals from 'eslint-config-next/core-web-vitals'
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+  ]),
+])
+
+export default eslintConfig
+```
+
+  </Step>
+  <Step title="Run ESLint">
+
+```bash
+npx eslint .
+```
+
+  </Step>
+</Steps>
+
+## Rules
+
+The `@next/eslint-plugin-next` package provides the following rules (all enabled in the recommended config):
+
+| Rule | Description |
+|---|---|
+| `@next/next/google-font-display` | Enforce `font-display` behavior with Google Fonts |
+| `@next/next/google-font-preconnect` | Ensure `preconnect` is used with Google Fonts |
+| `@next/next/inline-script-id` | Enforce `id` attribute on `next/script` with inline content |
+| `@next/next/next-script-for-ga` | Prefer `next/script` for Google Analytics inline scripts |
+| `@next/next/no-assign-module-variable` | Prevent assignment to the `module` variable |
+| `@next/next/no-async-client-component` | Prevent async Client Components |
+| `@next/next/no-before-interactive-script-outside-document` | Prevent `beforeInteractive` strategy outside `_document` |
+| `@next/next/no-css-tags` | Prevent manual `<link>` stylesheet tags |
+| `@next/next/no-document-import-in-page` | Prevent `next/document` imports outside `_document` |
+| `@next/next/no-duplicate-head` | Prevent duplicate `<Head>` in `_document` |
+| `@next/next/no-head-element` | Prevent usage of raw `<head>` element |
+| `@next/next/no-head-import-in-document` | Prevent `next/head` imports in `_document` |
+| `@next/next/no-html-link-for-pages` | Prevent `<a>` for internal Next.js navigation |
+| `@next/next/no-img-element` | Prevent raw `<img>` (use `next/image`) |
+| `@next/next/no-page-custom-font` | Prevent page-level custom font loading |
+| `@next/next/no-script-component-in-head` | Prevent `next/script` inside `next/head` |
+| `@next/next/no-styled-jsx-in-document` | Prevent `styled-jsx` in `_document` |
+| `@next/next/no-sync-scripts` | Prevent synchronous scripts |
+| `@next/next/no-title-in-document-head` | Prevent `<title>` with `Head` from `next/document` |
+| `@next/next/no-typos` | Prevent typos in Next.js data-fetching function names |
+| `@next/next/no-unwanted-polyfillio` | Prevent duplicate Polyfill.io polyfills |
+
+## Examples
+
+### With TypeScript
+
+```js eslint.config.mjs
+import { defineConfig, globalIgnores } from 'eslint/config'
+import nextVitals from 'eslint-config-next/core-web-vitals'
+import nextTs from 'eslint-config-next/typescript'
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
+])
+
+export default eslintConfig
+```
+
+### Disabling rules
+
+```js eslint.config.mjs
+import { defineConfig, globalIgnores } from 'eslint/config'
+import nextVitals from 'eslint-config-next/core-web-vitals'
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  {
+    rules: {
+      'react/no-unescaped-entities': 'off',
+      '@next/next/no-page-custom-font': 'off',
+    },
+  },
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
+])
+
+export default eslintConfig
+```
+
+### With Prettier
+
+Install `eslint-config-prettier` to prevent conflicts between ESLint formatting rules and Prettier:
+
+<Tabs>
+  <Tab title="pnpm">
+```bash
+pnpm add -D eslint-config-prettier
+```
+  </Tab>
+  <Tab title="npm">
+```bash
+npm i -D eslint-config-prettier
+```
+  </Tab>
+</Tabs>
+
+```js eslint.config.mjs
+import { defineConfig, globalIgnores } from 'eslint/config'
+import nextVitals from 'eslint-config-next/core-web-vitals'
+import prettier from 'eslint-config-prettier/flat'
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  prettier,
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
+])
+
+export default eslintConfig
+```
+
+### Monorepo setup
+
+When Next.js is not installed at the repository root, tell the plugin where to find your app:
+
+```js eslint.config.mjs
+import { defineConfig } from 'eslint/config'
+import eslintNextPlugin from '@next/eslint-plugin-next'
+
+const eslintConfig = defineConfig([
+  {
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    plugins: { next: eslintNextPlugin },
+    settings: {
+      next: { rootDir: 'packages/my-app/' },
+    },
+  },
+])
+
+export default eslintConfig
+```
+
+### Using the plugin directly
+
+Use `@next/eslint-plugin-next` directly when you already have conflicting plugins (e.g. `airbnb`, `react-app`):
+
+```js eslint.config.mjs
+import { defineConfig } from 'eslint/config'
+import nextPlugin from '@next/eslint-plugin-next'
+
+const eslintConfig = defineConfig([
+  {
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    plugins: { '@next/next': nextPlugin },
+    rules: { ...nextPlugin.configs.recommended.rules },
+  },
+])
+
+export default eslintConfig
+```
+
+### Lint-staged
+
+Run ESLint only on staged files with `lint-staged`:
+
+```js .lintstagedrc.js
+const path = require('path')
+
+const buildEslintCommand = (filenames) =>
+  `eslint --fix ${filenames.map((f) => `"${path.relative(process.cwd(), f)}"`).join(' ')}`
+
+module.exports = {
+  '*.{js,jsx,ts,tsx}': [buildEslintCommand],
+}
+```
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v16.0.0` | `next lint` and the `eslint` config option removed; use ESLint CLI directly |

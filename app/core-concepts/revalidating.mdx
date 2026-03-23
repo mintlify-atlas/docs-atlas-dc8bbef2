@@ -1,0 +1,168 @@
+---
+title: Revalidating
+description: Learn how to keep cached data fresh using time-based revalidation with cacheLife, and on-demand revalidation with revalidateTag, updateTag, and revalidatePath.
+---
+
+Revalidation is the process of updating cached data. It lets you keep serving fast, cached responses while ensuring content stays fresh.
+
+<Note>
+  This page covers revalidation with Cache Components (`cacheComponents: true`). For the previous model, see the [Caching and Revalidating (Previous Model)](/app/core-concepts/caching) guide.
+</Note>
+
+There are two strategies:
+
+- **Time-based revalidation**: Automatically refresh cached data after a set duration using `cacheLife`
+- **On-demand revalidation**: Manually invalidate cached data after a mutation using `revalidateTag`, `updateTag`, or `revalidatePath`
+
+## Time-based revalidation with `cacheLife`
+
+`cacheLife` controls how long cached data remains valid. Use it inside a `use cache` scope:
+
+```tsx filename="app/lib/data.ts"
+import { cacheLife } from 'next/cache'
+
+export async function getProducts() {
+  'use cache'
+  cacheLife('hours')
+  return db.query('SELECT * FROM products')
+}
+```
+
+`cacheLife` accepts a profile name or a custom object with `stale`, `revalidate`, and `expire` fields:
+
+```tsx
+'use cache'
+cacheLife({
+  stale: 3600,      // 1 hour until considered stale
+  revalidate: 7200, // 2 hours until background revalidation
+  expire: 86400,    // 1 day until hard expiration
+})
+```
+
+See the [cacheLife profiles table](/app/core-concepts/caching#cachelife-profiles) for all built-in profile values.
+
+<Note>
+  A cache is considered "short-lived" when it uses the `seconds` profile, `revalidate: 0`, or `expire` under 5 minutes. Short-lived caches are automatically excluded from prerenders.
+</Note>
+
+## On-demand revalidation
+
+### `cacheTag`
+
+Tag cached data so it can be invalidated on-demand:
+
+```tsx filename="app/lib/data.ts"
+import { cacheTag } from 'next/cache'
+
+export async function getProducts() {
+  'use cache'
+  cacheTag('products')
+  return db.query('SELECT * FROM products')
+}
+```
+
+Multiple functions can share the same tag. Invalidating the tag revalidates all of them at once.
+
+### `revalidateTag`
+
+`revalidateTag` invalidates cache entries by tag using **stale-while-revalidate** semantics — stale content is served immediately while fresh content loads in the background. Ideal when a slight delay in updates is acceptable:
+
+```tsx filename="app/lib/actions.ts"
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Mutate data...
+  revalidateTag('user', 'max') // stale-while-revalidate
+}
+```
+
+Call `revalidateTag` in a Server Action or Route Handler. The second argument sets how long stale content can be served while fresh content generates in the background. Using `'max'` gives the longest stale window.
+
+### `updateTag`
+
+`updateTag` immediately expires cached data for **read-your-own-writes** scenarios — the user sees their change right away instead of stale content. Can only be used in Server Actions:
+
+```tsx filename="app/lib/actions.ts"
+import { updateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  const post = await db.post.create({
+    data: {
+      title: formData.get('title'),
+      content: formData.get('content'),
+    },
+  })
+
+  updateTag('posts')
+  redirect(`/posts/${post.id}`)
+}
+```
+
+### `revalidatePath`
+
+`revalidatePath` invalidates all cached data for a specific route path:
+
+```tsx filename="app/lib/actions.ts"
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // Mutate data...
+  revalidatePath('/profile')
+}
+```
+
+<Tip>
+  Prefer tag-based revalidation (`revalidateTag`/`updateTag`) over path-based when possible — it's more precise and avoids over-invalidating.
+</Tip>
+
+## Comparing the APIs
+
+|              | `updateTag`                          | `revalidateTag`                   | `revalidatePath`         |
+| ------------ | ------------------------------------ | --------------------------------- | ------------------------ |
+| **Where**    | Server Actions only                  | Server Actions and Route Handlers | Server Actions and Route Handlers |
+| **Behavior** | Immediately expires cache            | Stale-while-revalidate            | Invalidates route path   |
+| **Use case** | Read-your-own-writes                 | Background refresh                | Route-wide invalidation  |
+
+## What to cache
+
+Cache data that:
+
+- Doesn't depend on runtime data (cookies, headers, search params)
+- You're OK serving from cache for a period of time
+
+For content management systems, use tags with longer cache durations and rely on `revalidateTag` to refresh content when it actually changes, rather than expiring the cache preemptively.
+
+## Example: Blog with on-demand revalidation
+
+```tsx filename="app/lib/data.ts"
+import { cacheLife, cacheTag } from 'next/cache'
+
+export async function getBlogPosts() {
+  'use cache'
+  cacheLife('days')
+  cacheTag('posts')
+
+  return db.posts.findMany({ orderBy: { createdAt: 'desc' } })
+}
+```
+
+```tsx filename="app/lib/actions.ts"
+'use server'
+
+import { updateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  const post = await db.posts.create({
+    data: {
+      title: formData.get('title') as string,
+      content: formData.get('content') as string,
+    },
+  })
+
+  // Immediately expire the posts cache so the new post is visible
+  updateTag('posts')
+  redirect(`/blog/${post.id}`)
+}
+```

@@ -1,0 +1,306 @@
+---
+title: Data Fetching
+description: Learn how to fetch data in Server and Client Components using async/await, the fetch API, ORMs, and parallel data fetching patterns.
+---
+
+The App Router lets you fetch data directly inside components using async/await. Server Components run on the server, so you can safely query databases and external APIs without exposing credentials to the client.
+
+## Server Components
+
+### With the fetch API
+
+Turn a component into an async function and await the `fetch` call:
+
+```tsx filename="app/blog/page.tsx"
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog')
+  const posts = await data.json()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+<Note>
+  Identical `fetch` requests in a React component tree are memoized by default, so you can fetch data in the component that needs it instead of drilling props. `fetch` results are not cached unless you use the `use cache` directive.
+</Note>
+
+### With an ORM or database
+
+Since Server Components run on the server, credentials and query logic are never included in the client bundle:
+
+```tsx filename="app/blog/page.tsx"
+import { db, posts } from '@/lib/db'
+
+export default async function Page() {
+  const allPosts = await db.select().from(posts)
+
+  return (
+    <ul>
+      {allPosts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## Client Components
+
+### With the `use` API
+
+Start a fetch in your Server Component and pass the unawaited promise to a Client Component:
+
+```tsx filename="app/blog/page.tsx"
+import Posts from '@/app/ui/posts'
+import { Suspense } from 'react'
+
+export default function Page() {
+  // Don't await — pass the promise directly
+  const posts = getPosts()
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Posts posts={posts} />
+    </Suspense>
+  )
+}
+```
+
+```tsx filename="app/ui/posts.tsx"
+'use client'
+import { use } from 'react'
+
+export default function Posts({
+  posts,
+}: {
+  posts: Promise<{ id: string; title: string }[]>
+}) {
+  const allPosts = use(posts)
+
+  return (
+    <ul>
+      {allPosts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### With community libraries
+
+Use [SWR](https://swr.vercel.app/) or [React Query](https://tanstack.com/query/latest) for client-side data fetching with caching and revalidation semantics:
+
+```tsx filename="app/blog/page.tsx"
+'use client'
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+export default function BlogPage() {
+  const { data, error, isLoading } = useSWR(
+    'https://api.vercel.app/blog',
+    fetcher
+  )
+
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
+
+  return (
+    <ul>
+      {data.map((post: { id: string; title: string }) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## Parallel data fetching
+
+Multiple sequential `await` calls inside a component will run one after another. To fetch data in parallel, initiate requests before awaiting them:
+
+<CodeGroup>
+
+```tsx filename="sequential (slow)"
+export default async function Page({ params }) {
+  const { username } = await params
+  // getAlbums is blocked until getArtist resolves
+  const artist = await getArtist(username)
+  const albums = await getAlbums(username)
+  return <div>{artist.name}</div>
+}
+```
+
+```tsx filename="parallel (fast)"
+import Albums from './albums'
+
+async function getArtist(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getAlbums(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}/albums`)
+  return res.json()
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}) {
+  const { username } = await params
+
+  // Initiate both requests before awaiting either
+  const artistData = getArtist(username)
+  const albumsData = getAlbums(username)
+
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums} />
+    </>
+  )
+}
+```
+
+</CodeGroup>
+
+<Note>
+  If one request fails with `Promise.all`, the entire operation fails. Use `Promise.allSettled` to handle partial failures gracefully.
+</Note>
+
+## Sequential data fetching with Suspense
+
+When one request depends on the result of another, use Suspense to stream the dependent component while showing a fallback:
+
+```tsx filename="app/artist/[username]/page.tsx"
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}) {
+  const { username } = await params
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      {/* Streams in once artistID is available */}
+      <Suspense fallback={<div>Loading playlists...</div>}>
+        <Playlists artistID={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+
+async function Playlists({ artistID }: { artistID: string }) {
+  const playlists = await getArtistPlaylists(artistID)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## Sharing data with React.cache
+
+Use `React.cache` to deduplicate identical requests across a component tree, and share the result between Server Components and context-based Client Components:
+
+```typescript filename="app/lib/user.ts"
+import { cache } from 'react'
+
+export const getUser = cache(async () => {
+  const res = await fetch('https://api.example.com/user')
+  return res.json()
+})
+```
+
+Create a context provider that stores the promise:
+
+```tsx filename="app/user-provider.tsx"
+'use client'
+
+import { createContext } from 'react'
+
+type User = { id: string; name: string }
+
+export const UserContext = createContext<Promise<User> | null>(null)
+
+export default function UserProvider({
+  children,
+  userPromise,
+}: {
+  children: React.ReactNode
+  userPromise: Promise<User>
+}) {
+  return <UserContext value={userPromise}>{children}</UserContext>
+}
+```
+
+In a layout, pass the unawaited promise to the provider:
+
+```tsx filename="app/layout.tsx"
+import UserProvider from './user-provider'
+import { getUser } from './lib/user'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const userPromise = getUser() // Don't await
+
+  return (
+    <html>
+      <body>
+        <UserProvider userPromise={userPromise}>{children}</UserProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+Client Components resolve the promise from context using `use()`:
+
+```tsx filename="app/ui/profile.tsx"
+'use client'
+
+import { use, useContext } from 'react'
+import { UserContext } from '../user-provider'
+
+export function Profile() {
+  const userPromise = useContext(UserContext)
+  if (!userPromise) throw new Error('Must be used within UserProvider')
+  const user = use(userPromise)
+  return <p>Welcome, {user.name}</p>
+}
+```
+
+Server Components can call `getUser()` directly — `React.cache` ensures the result is memoized and not fetched twice:
+
+```tsx filename="app/dashboard/page.tsx"
+import { getUser } from '../lib/user'
+
+export default async function DashboardPage() {
+  const user = await getUser() // Cached - no duplicate fetch
+  return <h1>Dashboard for {user.name}</h1>
+}
+```
+
+<Note>
+  `React.cache` is scoped to the current request only. Each request gets its own memoization scope with no sharing between requests.
+</Note>

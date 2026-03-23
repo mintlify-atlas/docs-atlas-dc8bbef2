@@ -1,0 +1,175 @@
+---
+title: "middleware.ts"
+description: "API reference for the middleware.ts file convention. Run code before a request completes to redirect, rewrite, set headers, or modify cookies."
+---
+
+Middleware runs before a request is completed. It can inspect the incoming request and respond by redirecting, rewriting, setting headers, or modifying cookies.
+
+```ts middleware.ts
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  return NextResponse.redirect(new URL('/home', request.url))
+}
+
+export const config = {
+  matcher: '/about/:path*',
+}
+```
+
+## Convention
+
+Create a `middleware.ts` (or `middleware.js`) file in the **root** of your project (at the same level as `app/` or `pages/`). Only one middleware file is supported per project.
+
+## Exports
+
+### `middleware` function
+
+<ParamField path="request" type="NextRequest">
+  The incoming [NextRequest](/api-reference/functions/next-request) object, which extends the Web `Request` API with:
+  - `request.nextUrl` — a parsed URL object with a `searchParams` helper and `pathname`
+  - `request.cookies` — read/write access to request cookies
+  - `request.headers` — read access to request headers
+</ParamField>
+
+The function should return a `NextResponse` or `Response`, or `undefined` to pass through.
+
+### `config` (optional)
+
+Export a `config` object to control which paths the middleware runs on:
+
+```ts middleware.ts
+export const config = {
+  matcher: [
+    '/about/:path*',
+    '/dashboard/:path*',
+    // Exclude static files and internal Next.js paths
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+}
+```
+
+`matcher` accepts:
+- A single string: `'/about/:path*'`
+- An array of strings
+- Regular expressions (as strings)
+
+**Matcher rules:**
+- Must start with `/`
+- Named parameters like `:path` match a single segment
+- `:path*` matches zero or more segments
+- Negative lookaheads `(?!...)` exclude paths
+
+## `NextResponse` API
+
+<AccordionGroup>
+  <Accordion title="NextResponse.redirect">
+    Returns a redirect response to a new URL. The original URL is not loaded.
+
+    ```ts
+    return NextResponse.redirect(new URL('/home', request.url))
+    return NextResponse.redirect(new URL('/login', request.url), 307)
+    ```
+  </Accordion>
+  <Accordion title="NextResponse.rewrite">
+    Rewrites the request to a different URL without changing the URL visible to the user.
+
+    ```ts
+    return NextResponse.rewrite(new URL('/proxy', request.url))
+    ```
+  </Accordion>
+  <Accordion title="NextResponse.next">
+    Continues the middleware chain, optionally modifying headers.
+
+    ```ts
+    const response = NextResponse.next()
+    response.headers.set('x-custom-header', 'value')
+    return response
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Examples
+
+### Redirecting unauthenticated users
+
+```ts middleware.ts
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get('auth-token')
+
+  if (!token) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: '/dashboard/:path*',
+}
+```
+
+### Rewriting requests
+
+```ts middleware.ts
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const country = request.geo?.country ?? 'US'
+
+  if (country === 'GB') {
+    return NextResponse.rewrite(new URL('/gb' + request.nextUrl.pathname, request.url))
+  }
+
+  return NextResponse.next()
+}
+```
+
+### Setting request headers
+
+```ts middleware.ts
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', request.nextUrl.pathname)
+
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  })
+}
+```
+
+### Setting response cookies
+
+```ts middleware.ts
+import { NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const response = NextResponse.next()
+  response.cookies.set('session', 'abc123', {
+    httpOnly: true,
+    secure: true,
+  })
+  return response
+}
+```
+
+### Matching multiple paths
+
+```ts middleware.ts
+export const config = {
+  matcher: [
+    // Match all paths except static files and Next.js internals
+    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}
+```
+
+<Note>Middleware runs on the Edge Runtime by default. Node.js APIs are not available. Use the `experimental-edge` runtime config if you need them.</Note>

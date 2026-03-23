@@ -1,0 +1,229 @@
+---
+title: create-next-app
+description: Create a new Next.js application with a single command using create-next-app.
+---
+
+`create-next-app` is the official CLI tool for bootstrapping a new Next.js project. It sets up a fully configured project with your chosen options.
+
+## Usage
+
+<Tabs>
+  <Tab title="pnpm">
+```bash
+pnpm create next-app [project-name] [options]
+```
+  </Tab>
+  <Tab title="npm">
+```bash
+npx create-next-app@latest [project-name] [options]
+```
+  </Tab>
+  <Tab title="yarn">
+```bash
+yarn create next-app [project-name] [options]
+```
+  </Tab>
+  <Tab title="bun">
+```bash
+bun create next-app [project-name] [options]
+```
+  </Tab>
+</Tabs>
+
+## Flags
+
+### TypeScript and JavaScript
+
+<ParamField path="--ts / --typescript" type="boolean">
+  Initialize as a TypeScript project. This is the default.
+</ParamField>
+
+<ParamField path="--js / --javascript" type="boolean">
+  Initialize as a JavaScript project.
+</ParamField>
+
+### Styling
+
+<ParamField path="--tailwind" type="boolean">
+  Initialize with Tailwind CSS configuration. Enabled by default.
+</ParamField>
+
+### Linting
+
+<ParamField path="--eslint" type="boolean">
+  Initialize with ESLint configuration.
+</ParamField>
+
+<ParamField path="--biome" type="boolean">
+  Initialize with Biome configuration (fast linter and formatter).
+</ParamField>
+
+<ParamField path="--no-linter" type="boolean">
+  Skip linter configuration entirely.
+</ParamField>
+
+### Router and structure
+
+<ParamField path="--app" type="boolean">
+  Initialize as an App Router project.
+</ParamField>
+
+<ParamField path="--api" type="boolean">
+  Initialize a minimal project with only route handlers (no UI).
+</ParamField>
+
+<ParamField path="--src-dir" type="boolean">
+  Place the project code inside a `src/` directory.
+</ParamField>
+
+<ParamField path="--import-alias <alias>" type="string" default="@/*">
+  Configure the import alias used throughout the project.
+</ParamField>
+
+<ParamField path="--empty" type="boolean">
+  Initialize a minimal empty project.
+</ParamField>
+
+### Bundler
+
+<ParamField path="--turbopack" type="boolean">
+  Force Turbopack in the generated `package.json`. Turbopack is enabled by default in Next.js 15+.
+</ParamField>
+
+<ParamField path="--webpack" type="boolean">
+  Force Webpack in the generated `package.json`.
+</ParamField>
+
+### Package manager
+
+<ParamField path="--use-npm" type="boolean">
+  Bootstrap the project using npm.
+</ParamField>
+
+<ParamField path="--use-pnpm" type="boolean">
+  Bootstrap the project using pnpm.
+</ParamField>
+
+<ParamField path="--use-yarn" type="boolean">
+  Bootstrap the project using Yarn.
+</ParamField>
+
+<ParamField path="--use-bun" type="boolean">
+  Bootstrap the project using Bun.
+</ParamField>
+
+### Examples
+
+<ParamField path="-e / --example [name] [github-url]" type="string">
+  Bootstrap from a named Next.js example or any public GitHub repository URL.
+</ParamField>
+
+<ParamField path="--example-path <path>" type="string">
+  Specify a subdirectory path within the example repository.
+</ParamField>
+
+### Compiler
+
+<ParamField path="--react-compiler" type="boolean">
+  Initialize with React Compiler enabled.
+</ParamField>
+
+### Other
+
+<ParamField path="--reset-preferences" type="boolean">
+  Clear any stored CLI preferences and start fresh.
+</ParamField>
+
+<ParamField path="--skip-install" type="boolean">
+  Create the project files without running package installation.
+</ParamField>
+
+<ParamField path="--disable-git" type="boolean">
+  Skip git repository initialization.
+</ParamField>
+
+<ParamField path="--agents-md" type="boolean">
+  Include `AGENTS.md` and `CLAUDE.md` files to guide coding agents. Enabled by default.
+</ParamField>
+
+<ParamField path="--yes" type="boolean">
+  Accept all defaults or reuse previous preferences without interactive prompts.
+</ParamField>
+
+<ParamField path="-h / --help" type="boolean">
+  Show all available options.
+</ParamField>
+
+<ParamField path="-v / --version" type="boolean">
+  Output the `create-next-app` version number.
+</ParamField>
+
+## Interactive mode
+
+Run `create-next-app` without flags to start the interactive prompt:
+
+```bash
+npx create-next-app@latest
+```
+
+You will be asked:
+
+```
+What is your project named? my-app
+Would you like to use the recommended Next.js defaults?
+    Yes, use recommended defaults - TypeScript, ESLint, Tailwind CSS, App Router, AGENTS.md
+    No, reuse previous settings
+    No, customize settings - Choose your own preferences
+```
+
+Choosing **customize settings** presents:
+
+```
+Would you like to use TypeScript? No / Yes
+Which linter would you like to use? ESLint / Biome / None
+Would you like to use React Compiler? No / Yes
+Would you like to use Tailwind CSS? No / Yes
+Would you like your code inside a `src/` directory? No / Yes
+Would you like to use App Router? (recommended) No / Yes
+Would you like to customize the import alias (`@/*` by default)? No / Yes
+What import alias would you like configured? @/*
+Would you like to include AGENTS.md? No / Yes
+```
+
+## Non-interactive mode
+
+Pass all flags at once to skip prompts:
+
+```bash
+npx create-next-app@latest my-app --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
+```
+
+## Examples
+
+### Default template
+
+```bash
+npx create-next-app@latest my-app
+```
+
+### From an official example
+
+```bash
+npx create-next-app@latest my-app --example with-tailwindcss
+```
+
+Browse all available examples in the [Next.js repository](https://github.com/vercel/next.js/tree/canary/examples).
+
+### From a GitHub repository
+
+```bash
+npx create-next-app@latest my-app --example "https://github.com/my-org/my-template"
+```
+
+### JavaScript project
+
+```bash
+npx create-next-app@latest my-app --no-ts --no-tailwind
+```
+
+(`--no-*` negates any default option.)

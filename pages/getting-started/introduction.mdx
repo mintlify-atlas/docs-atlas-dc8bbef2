@@ -1,0 +1,60 @@
+---
+title: Introduction to the Pages Router
+description: An overview of the Pages Router, how it differs from the App Router, and when to use it.
+---
+
+The **Pages Router** is Next.js's original file-system based routing system. Each file you add to the `pages/` directory automatically becomes a route.
+
+Before Next.js 13 introduced the App Router, the Pages Router was the primary way to build Next.js applications. It remains fully supported and is a stable, production-ready option.
+
+<Note>
+If you are starting a new project, consider using the [App Router](/app/getting-started/introduction). It supports React Server Components, streaming, and other modern React features. The Pages Router is best for teams maintaining existing codebases or who need time to migrate.
+</Note>
+
+## Pages Router vs App Router
+
+The two routers coexist in the same Next.js installation. You can use both in one project during a gradual migration.
+
+| Feature | Pages Router | App Router |
+| --- | --- | --- |
+| Directory | `pages/` | `app/` |
+| Routing | File-based, one file = one route | Nested layouts with `layout.tsx` |
+| Data fetching | `getStaticProps`, `getServerSideProps` | `async` Server Components, `fetch` |
+| Server Components | No | Yes |
+| Streaming | Limited (API routes) | Built-in with Suspense |
+| Layouts | Manual via `_app.js` or `getLayout` | Nested `layout.tsx` files |
+| Metadata | `next/head` | `generateMetadata` / `metadata` export |
+
+## When to use the Pages Router
+
+Choose the Pages Router when:
+
+- You are maintaining an existing Pages Router codebase.
+- Your team is not yet ready to adopt React Server Components.
+- You need a well-understood, battle-tested routing model.
+- You are migrating incrementally from the Pages Router to the App Router.
+
+## Core concepts
+
+<CardGroup cols={2}>
+  <Card title="File-based routing" icon="folder" href="/pages/building/routing">
+    Every `.js`, `.jsx`, `.ts`, or `.tsx` file in `pages/` maps directly to a route.
+  </Card>
+  <Card title="Data fetching" icon="database" href="/pages/building/data-fetching">
+    Fetch data at build time with `getStaticProps`, or on every request with `getServerSideProps`.
+  </Card>
+  <Card title="Rendering" icon="server" href="/pages/building/rendering">
+    Choose between Static Generation, Server-side Rendering, and client-side rendering per page.
+  </Card>
+  <Card title="API routes" icon="code" href="/pages/building/routing">
+    Build API endpoints in `pages/api/` alongside your page routes.
+  </Card>
+</CardGroup>
+
+## Migrating to the App Router
+
+Next.js supports incremental adoption of the App Router. You can migrate one route at a time while keeping the rest of your application in the Pages Router.
+
+Both routers work simultaneously—requests to routes in `app/` are handled by the App Router, and requests to routes in `pages/` are handled by the Pages Router.
+
+See the [migration guide](https://nextjs.org/app/guides/migrating/app-router-migration) for a step-by-step walkthrough.

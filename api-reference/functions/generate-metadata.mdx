@@ -1,0 +1,281 @@
+---
+title: generateMetadata
+description: API reference for the metadata object and generateMetadata function used to define page metadata for SEO and web shareability.
+---
+
+Next.js provides two ways to define metadata (such as `<title>` and `<meta>` tags): a static `metadata` export and an async `generateMetadata` function.
+
+Both are **Server Component-only** exports from `layout.tsx` or `page.tsx`.
+
+## Static `metadata` object
+
+Export a `Metadata` object for static, non-dynamic metadata:
+
+```typescript layout.tsx
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My App',
+  description: 'Welcome to my application.',
+}
+
+export default function Page() {}
+```
+
+## `generateMetadata` function
+
+Use `generateMetadata` when metadata depends on dynamic information such as route params or external data:
+
+```typescript app/products/[id]/page.tsx
+import type { Metadata, ResolvingMetadata } from 'next'
+
+type Props = {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export async function generateMetadata(
+  { params, searchParams }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const { id } = await params
+  const product = await fetch(`https://api.example.com/products/${id}`).then(
+    (res) => res.json()
+  )
+
+  // Optionally extend parent metadata instead of replacing it
+  const previousImages = (await parent).openGraph?.images || []
+
+  return {
+    title: product.title,
+    openGraph: {
+      images: ['/product-image.jpg', ...previousImages],
+    },
+  }
+}
+
+export default function Page({ params, searchParams }: Props) {}
+```
+
+### Parameters
+
+<ParamField body="props" type="object">
+  An object containing the current route's parameters:
+
+  - **`params`** (`Promise<object>`) — Dynamic route parameters from root to the current segment.
+  - **`searchParams`** (`Promise<object>`) — The current URL's search params. Only available in `page.js`.
+</ParamField>
+
+<ParamField body="parent" type="ResolvingMetadata">
+  A promise resolving to the metadata from parent route segments. Use to extend rather than replace parent values.
+</ParamField>
+
+### Returns
+
+A `Metadata` object (or a `Promise<Metadata>` for async functions).
+
+## Good to know
+
+- Only Server Components can export `metadata` or `generateMetadata`.
+- You cannot export both from the same route segment.
+- `fetch` requests inside `generateMetadata` are automatically [memoized](/app/core-concepts/routing#memoization).
+- [File-based metadata](/app/optimizations/metadata) takes priority over `metadata` or `generateMetadata`.
+- `redirect()` and `notFound()` can be called inside `generateMetadata`.
+
+## Metadata fields
+
+### `title`
+
+```typescript
+export const metadata: Metadata = {
+  title: 'My Page', // Simple string
+}
+// Output: <title>My Page</title>
+```
+
+You can also use an object for templates:
+
+```typescript app/layout.tsx
+export const metadata: Metadata = {
+  title: {
+    default: 'Acme', // fallback for child segments with no title
+    template: '%s | Acme', // applied to titles in child segments
+  },
+}
+```
+
+```typescript app/about/page.tsx
+export const metadata: Metadata = {
+  title: 'About', // Becomes: <title>About | Acme</title>
+}
+```
+
+Use `title.absolute` to override parent templates:
+
+```typescript
+export const metadata: Metadata = {
+  title: { absolute: 'About' }, // Becomes: <title>About</title>
+}
+```
+
+### `description`
+
+```typescript
+export const metadata: Metadata = {
+  description: 'The React Framework for the Web',
+}
+// Output: <meta name="description" content="The React Framework for the Web" />
+```
+
+### `metadataBase`
+
+Set a base URL for all relative URL fields:
+
+```typescript app/layout.tsx
+export const metadata: Metadata = {
+  metadataBase: new URL('https://acme.com'),
+  openGraph: {
+    images: '/og-image.png', // Resolved to: https://acme.com/og-image.png
+  },
+}
+```
+
+### `openGraph`
+
+```typescript
+export const metadata: Metadata = {
+  openGraph: {
+    title: 'Next.js',
+    description: 'The React Framework for the Web',
+    url: 'https://nextjs.org',
+    siteName: 'Next.js',
+    images: [
+      {
+        url: 'https://nextjs.org/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'Next.js logo',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+}
+```
+
+### `twitter`
+
+```typescript
+export const metadata: Metadata = {
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Next.js',
+    description: 'The React Framework for the Web',
+    creator: '@nextjs',
+    images: ['https://nextjs.org/og.png'],
+  },
+}
+```
+
+### `robots`
+
+```typescript
+export const metadata: Metadata = {
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+}
+```
+
+### `icons`
+
+<Tip>
+  Prefer the [file-based metadata API](/app/optimizations/metadata) for icons when possible.
+</Tip>
+
+```typescript
+export const metadata: Metadata = {
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/shortcut-icon.png',
+    apple: '/apple-icon.png',
+  },
+}
+```
+
+### `manifest`
+
+```typescript
+export const metadata: Metadata = {
+  manifest: 'https://example.com/manifest.json',
+}
+// Output: <link rel="manifest" href="https://example.com/manifest.json" />
+```
+
+### `alternates`
+
+```typescript
+export const metadata: Metadata = {
+  alternates: {
+    canonical: 'https://nextjs.org',
+    languages: {
+      'en-US': 'https://nextjs.org/en-US',
+      'de-DE': 'https://nextjs.org/de-DE',
+    },
+  },
+}
+```
+
+### `verification`
+
+```typescript
+export const metadata: Metadata = {
+  verification: {
+    google: 'google-site-verification-token',
+    yandex: 'yandex-token',
+  },
+}
+```
+
+### `other` (custom tags)
+
+```typescript
+export const metadata: Metadata = {
+  other: {
+    custom: 'meta-value',
+  },
+}
+// Output: <meta name="custom" content="meta-value" />
+```
+
+## Behavior
+
+### Evaluation order
+
+Metadata is evaluated from the root segment down to the closest `page.tsx`:
+
+1. `app/layout.tsx` (root layout)
+2. `app/blog/layout.tsx` (nested layout)
+3. `app/blog/[slug]/page.tsx` (page)
+
+### Merging
+
+Metadata objects from multiple segments are **shallowly merged**. Duplicate keys are replaced by the value from the deepest segment. Nested objects like `openGraph` are replaced entirely (not merged).
+
+### Streaming metadata
+
+Next.js 15.2+ supports streaming metadata: the initial UI is sent to the browser without waiting for `generateMetadata` to complete. For HTML-limited bots (e.g. Facebook's crawler) metadata continues to block rendering. See [`htmlLimitedBots`](/api-reference/config/next-config-js) to configure this.
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.2.0` | Streaming support for `generateMetadata` introduced. |
+| `v13.2.0` | `metadata` and `generateMetadata` introduced. |

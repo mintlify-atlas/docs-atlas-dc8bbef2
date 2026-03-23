@@ -1,0 +1,300 @@
+---
+title: Data fetching
+description: Deep dive into getStaticProps, getServerSideProps, getStaticPaths with fallback modes, and SWR for client-side data fetching in the Pages Router.
+---
+
+The Pages Router provides three server-side data fetching functions and supports client-side fetching via SWR or other libraries.
+
+## `getStaticProps`
+
+`getStaticProps` runs at build time on the server. Use it when the data needed to render a page is available ahead of a user's request.
+
+```tsx pages/index.tsx
+import type { InferGetStaticPropsType, GetStaticProps } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getStaticProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo: Repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetStaticProps<{ repo: Repo }>
+
+export default function Page({
+  repo,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return <p>{repo.name} has {repo.stargazers_count} stars</p>
+}
+```
+
+### When `getStaticProps` runs
+
+- Always during `next build`.
+- In the background when `revalidate` is set (ISR).
+- On every request during `next dev`.
+
+### Return values
+
+`getStaticProps` must return an object with one of these shapes:
+
+| Return | Description |
+| --- | --- |
+| `{ props }` | Pass data to the page component. |
+| `{ props, revalidate }` | Enable ISR. `revalidate` is a number of seconds. |
+| `{ notFound: true }` | Render the 404 page. |
+| `{ redirect: { destination } }` | Redirect to another page. |
+
+### Server-only code
+
+`getStaticProps` never runs on the client. You can import server-only modules and query databases directly:
+
+```tsx pages/blog.tsx
+import { loadPosts } from '../lib/db'
+import type { GetStaticProps } from 'next'
+
+export const getStaticProps: GetStaticProps = async () => {
+  // Direct database call — safe here, never runs in the browser
+  const posts = await loadPosts()
+  return { props: { posts } }
+}
+```
+
+### Restrictions
+
+- Only export `getStaticProps` from a **page file**. It cannot be used in `_app`, `_document`, or non-page files.
+- It does not have access to the incoming request (no query params, cookies, or headers).
+
+<Note>
+In the App Router, you fetch data directly in async Server Components using `fetch` or an ORM. There is no equivalent function to `getStaticProps`.
+</Note>
+
+## `getStaticPaths`
+
+When a page has dynamic routes and uses `getStaticProps`, you must also export `getStaticPaths`. It tells Next.js which paths to pre-generate at build time.
+
+```tsx pages/posts/[id].tsx
+import type {
+  InferGetStaticPropsType,
+  GetStaticProps,
+  GetStaticPaths,
+} from 'next'
+
+type Post = { id: string; title: string; content: string }
+
+export const getStaticPaths = (async () => {
+  const res = await fetch('https://api.example.com/posts')
+  const posts: Post[] = await res.json()
+
+  return {
+    paths: posts.map((post) => ({ params: { id: post.id } })),
+    fallback: false,
+  }
+}) satisfies GetStaticPaths
+
+export const getStaticProps = (async ({ params }) => {
+  const res = await fetch(`https://api.example.com/posts/${params?.id}`)
+  const post: Post = await res.json()
+  return { props: { post } }
+}) satisfies GetStaticProps<{ post: Post }>
+
+export default function Post({
+  post,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </article>
+  )
+}
+```
+
+### Fallback modes
+
+The `fallback` field controls what happens when a visitor requests a path that was not pre-generated.
+
+<AccordionGroup>
+  <Accordion title="fallback: false">
+    Any path not returned by `getStaticPaths` returns a 404 page. Use this when you have a small, known set of paths.
+
+    ```js
+    return { paths, fallback: false }
+    ```
+  </Accordion>
+  <Accordion title="fallback: true">
+    Paths not returned at build time are not 404. Next.js serves a fallback version of the page (you must handle the loading state), then generates and caches the full page in the background.
+
+    ```tsx pages/posts/[id].tsx
+    import { useRouter } from 'next/router'
+
+    export default function Post({ post }: { post: Post | null }) {
+      const router = useRouter()
+
+      if (router.isFallback) {
+        return <div>Loading...</div>
+      }
+
+      return <h1>{post?.title}</h1>
+    }
+    ```
+
+    ```js
+    return { paths, fallback: true }
+    ```
+  </Accordion>
+  <Accordion title="fallback: 'blocking'">
+    Paths not returned at build time cause Next.js to server-render the page on first request (like SSR), cache it, and serve the cached version for subsequent requests. The user waits but never sees a loading state.
+
+    ```js
+    return { paths, fallback: 'blocking' }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Skipping build-time generation
+
+Return an empty `paths` array to generate all pages on-demand. This speeds up builds for large sites:
+
+```ts pages/posts/[id].ts
+export async function getStaticPaths() {
+  if (process.env.SKIP_BUILD_STATIC_GENERATION) {
+    return { paths: [], fallback: 'blocking' }
+  }
+
+  const res = await fetch('https://api.example.com/posts')
+  const posts = await res.json()
+
+  return {
+    paths: posts.map((post: { id: string }) => ({ params: { id: post.id } })),
+    fallback: false,
+  }
+}
+```
+
+## `getServerSideProps`
+
+`getServerSideProps` runs on the server on **every request**. Use it when the page content depends on request-time data.
+
+```tsx pages/profile.tsx
+import type { GetServerSideProps, InferGetServerSidePropsType } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getServerSideProps = (async (context) => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo: Repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetServerSideProps<{ repo: Repo }>
+
+export default function Page({
+  repo,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  return (
+    <main>
+      <p>{repo.name}: {repo.stargazers_count} stars</p>
+    </main>
+  )
+}
+```
+
+### Accessing the request
+
+The `context` object contains the request and response:
+
+```ts
+export async function getServerSideProps({ req, res, params, query }) {
+  const token = req.cookies['auth-token']
+  // fetch data using token...
+  return { props: { data } }
+}
+```
+
+### Caching SSR responses
+
+Use `Cache-Control` headers to cache SSR responses at the CDN level:
+
+```ts
+export async function getServerSideProps({ req, res }) {
+  res.setHeader(
+    'Cache-Control',
+    'public, s-maxage=10, stale-while-revalidate=59'
+  )
+  return { props: {} }
+}
+```
+
+### Error handling
+
+If `getServerSideProps` throws an error, Next.js shows `pages/500.js`. In development, the error overlay is shown instead.
+
+```ts
+export async function getServerSideProps() {
+  try {
+    const data = await fetchData()
+    return { props: { data } }
+  } catch (error) {
+    // Next.js will show pages/500.js
+    throw error
+  }
+}
+```
+
+<Note>
+In the App Router, Server Components fetch data directly using `async/await`. The `getServerSideProps` pattern has no direct equivalent; instead, each component can be `async` and fetch its own data.
+</Note>
+
+## Client-side fetching with SWR
+
+For data that does not need to be server-rendered, fetch it on the client with [SWR](https://swr.vercel.app/).
+
+```tsx components/Profile.tsx
+import useSWR from 'swr'
+
+const fetcher = (...args: Parameters<typeof fetch>) =>
+  fetch(...args).then((res) => res.json())
+
+export default function Profile() {
+  const { data, error } = useSWR('/api/profile-data', fetcher)
+
+  if (error) return <div>Failed to load</div>
+  if (!data) return <div>Loading...</div>
+
+  return (
+    <div>
+      <h1>{data.name}</h1>
+      <p>{data.bio}</p>
+    </div>
+  )
+}
+```
+
+SWR handles caching, revalidation on focus, polling, and error retries. Install it with:
+
+```bash
+npm install swr
+```
+
+### SWR with an initial value from `getStaticProps`
+
+You can combine SSG and client-side fetching. Pass pre-fetched data as the `fallbackData` option so the page renders immediately, then revalidates in the background:
+
+```tsx pages/profile.tsx
+import useSWR from 'swr'
+import type { GetStaticProps } from 'next'
+
+export const getStaticProps: GetStaticProps = async () => {
+  const data = await fetchProfile()
+  return { props: { fallbackData: data }, revalidate: 60 }
+}
+
+export default function Profile({ fallbackData }: { fallbackData: any }) {
+  const { data } = useSWR('/api/profile', fetcher, { fallbackData })
+  return <div>{data?.name}</div>
+}
+```

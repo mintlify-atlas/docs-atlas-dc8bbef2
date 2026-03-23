@@ -1,0 +1,205 @@
+---
+title: "layout.js"
+description: "API reference for the layout.js file convention. Layouts wrap route segments and persist across navigations, preserving state and avoiding unnecessary re-renders."
+---
+
+A `layout` file defines UI that is shared across multiple routes. Layouts persist across navigations and do not re-render when their child routes change.
+
+```jsx app/dashboard/layout.js
+export default function DashboardLayout({ children }) {
+  return <section>{children}</section>
+}
+```
+
+## Root layout
+
+The `app` directory must include a root `layout.js`. The root layout defines the `<html>` and `<body>` tags and is applied to every route.
+
+```jsx app/layout.js
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+<Warning>
+  Do not add `<head>` tags like `<title>` or `<meta>` directly in the root layout. Use the [Metadata API](/api-reference/file-conventions/page) instead, which handles streaming and deduplication automatically.
+</Warning>
+
+## Props
+
+<ParamField path="children" type="React.ReactNode" required>
+  The nested layout or page rendered by this layout segment. May also include other special files like `loading.js` or `error.js` when applicable.
+</ParamField>
+
+<ParamField path="params" type="Promise<object>">
+  A promise that resolves to the dynamic route parameters from the root segment down to the current layout.
+
+  ```jsx app/dashboard/[team]/layout.js
+  export default async function Layout({ children, params }) {
+    const { team } = await params
+    return (
+      <section>
+        <h1>Team: {team}</h1>
+        {children}
+      </section>
+    )
+  }
+  ```
+
+  | Route | URL | `params` |
+  | --- | --- | --- |
+  | `app/dashboard/[team]/layout.js` | `/dashboard/1` | `Promise<{ team: '1' }>` |
+  | `app/shop/[tag]/[item]/layout.js` | `/shop/1/2` | `Promise<{ tag: '1', item: '2' }>` |
+  | `app/blog/[...slug]/layout.js` | `/blog/1/2` | `Promise<{ slug: ['1', '2'] }>` |
+
+  Use `async/await` or React's `use()` to read the value.
+</ParamField>
+
+## TypeScript helper
+
+Use the global `LayoutProps` helper to get strongly typed props, including `params` and named parallel route slots:
+
+```tsx app/dashboard/layout.tsx
+export default function Layout(props: LayoutProps<'/dashboard'>) {
+  return (
+    <section>
+      {props.children}
+    </section>
+  )
+}
+```
+
+<Note>Types are generated during `next dev`, `next build`, or `next typegen`. `LayoutProps` is globally available and does not need to be imported.</Note>
+
+## Root layout requirements
+
+- Must define `<html>` and `<body>` tags
+- Must not add `<head>` tags directly — use the [Metadata API](/api-reference/file-conventions/page) instead
+- Can have multiple root layouts using route groups (e.g., `app/(shop)/layout.js` and `app/(marketing)/layout.js`)
+- Navigating between different root layouts causes a full page load (not client-side navigation)
+
+## Caveats
+
+### Request object
+
+Layouts do not have direct access to the incoming request. Use the `headers()` and `cookies()` APIs from `next/headers` instead.
+
+```jsx app/shop/layout.js
+import { cookies } from 'next/headers'
+
+export default async function Layout({ children }) {
+  const cookieStore = await cookies()
+  const theme = cookieStore.get('theme')
+  return '...'
+}
+```
+
+### Query params
+
+Layouts do not re-render on navigation, so `searchParams` in a layout would become stale. To access current query params, use the `searchParams` prop in a [page](/api-reference/file-conventions/page), or use `useSearchParams()` in a Client Component.
+
+### Pathname
+
+Layouts do not re-render on navigation. To access the current pathname, use `usePathname()` in a Client Component.
+
+### Fetching data
+
+Layouts cannot pass fetched data directly to child pages. However, you can fetch the same data in both the layout and the page. Next.js automatically deduplicates `fetch` calls, so performance is not affected.
+
+## Examples
+
+### Exporting metadata
+
+```jsx app/layout.js
+export const metadata = {
+  title: 'My App',
+}
+
+export default function Layout({ children }) {
+  return '...'
+}
+```
+
+### Displaying content based on params
+
+```jsx app/dashboard/[team]/layout.js
+export default async function DashboardLayout({ children, params }) {
+  const { team } = await params
+
+  return (
+    <section>
+      <header>
+        <h1>Welcome to {team}'s Dashboard</h1>
+      </header>
+      <main>{children}</main>
+    </section>
+  )
+}
+```
+
+### Reading params in a Client Component
+
+Use React's `use()` function to read the params promise in a Client Component:
+
+```jsx app/page.js
+'use client'
+
+import { use } from 'react'
+
+export default function Page({ params }) {
+  const { slug } = use(params)
+}
+```
+
+### Accessing child route segment
+
+Use `useSelectedLayoutSegment()` or `useSelectedLayoutSegments()` in a Client Component to read the active route segment below the layout:
+
+```jsx app/ui/nav-link.js
+'use client'
+
+import Link from 'next/link'
+import { useSelectedLayoutSegment } from 'next/navigation'
+
+export default function NavLink({ slug, children }) {
+  const segment = useSelectedLayoutSegment()
+  const isActive = slug === segment
+
+  return (
+    <Link href={`/blog/${slug}`} style={{ fontWeight: isActive ? 'bold' : 'normal' }}>
+      {children}
+    </Link>
+  )
+}
+```
+
+### Active nav links
+
+```jsx app/ui/nav-links.js
+'use client'
+
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+
+export function NavLinks() {
+  const pathname = usePathname()
+
+  return (
+    <nav>
+      <Link className={pathname === '/' ? 'active' : ''} href="/">Home</Link>
+      <Link className={pathname === '/about' ? 'active' : ''} href="/about">About</Link>
+    </nav>
+  )
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.0.0-RC` | `params` is now a promise |
+| `v13.0.0` | `layout` introduced |

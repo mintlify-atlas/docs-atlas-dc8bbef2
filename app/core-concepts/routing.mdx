@@ -1,0 +1,278 @@
+---
+title: Routing
+description: Learn how the App Router uses the file system to define routes — including dynamic routes, route groups, layouts, and middleware.
+---
+
+Next.js uses **file-system based routing**. Folders and files inside the `app` directory map directly to URL paths.
+
+## File-system routing
+
+The App Router defines routes using two conventions:
+
+- **Folders** define the route segments that map to URL segments
+- **Files** (`page.tsx`, `layout.tsx`, etc.) create UI that is shown for a segment
+
+### Pages
+
+A `page` file makes a route segment publicly accessible:
+
+```tsx filename="app/page.tsx"
+export default function Page() {
+  return <h1>Hello Next.js!</h1>
+}
+```
+
+```
+app/
+├── page.tsx          → /
+├── blog/
+│   ├── page.tsx      → /blog
+│   └── [slug]/
+│       └── page.tsx  → /blog/:slug
+```
+
+### Layouts
+
+A `layout` file defines UI that is shared across multiple pages. Layouts preserve state, remain interactive, and do not re-render on navigation.
+
+```tsx filename="app/layout.tsx"
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <main>{children}</main>
+      </body>
+    </html>
+  )
+}
+```
+
+The root layout at `app/layout.tsx` is required and must contain `<html>` and `<body>` tags.
+
+### Nested layouts
+
+Layouts are nested automatically. A layout at `app/blog/layout.tsx` wraps all pages inside `app/blog/`:
+
+```tsx filename="app/blog/layout.tsx"
+export default function BlogLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <section>{children}</section>
+}
+```
+
+The rendering hierarchy becomes: `RootLayout → BlogLayout → Page`.
+
+## Dynamic routes
+
+Wrap a folder name in square brackets to create a dynamic segment:
+
+```tsx filename="app/blog/[slug]/page.tsx"
+export default async function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const post = await getPost(slug)
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  )
+}
+```
+
+<Note>
+  `params` is a Promise in the App Router. Always `await` it before accessing its values.
+</Note>
+
+### Catch-all segments
+
+Use `[...slug]` to match multiple segments:
+
+```
+app/docs/[...slug]/page.tsx  →  /docs/a, /docs/a/b, /docs/a/b/c
+```
+
+Use `[[...slug]]` (double brackets) for optional catch-all, which also matches the root `/docs`.
+
+### generateStaticParams
+
+Use `generateStaticParams` to statically generate dynamic routes at build time:
+
+```tsx filename="app/blog/[slug]/page.tsx"
+export async function generateStaticParams() {
+  const posts = await getPosts()
+  return posts.map((post) => ({ slug: post.slug }))
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  // ...
+}
+```
+
+## Route groups
+
+Wrap a folder name in parentheses to create a route group. Route groups organize routes without affecting the URL:
+
+```
+app/
+├── (marketing)/
+│   ├── layout.tsx    ← applies only to this group
+│   ├── page.tsx      → /
+│   └── about/
+│       └── page.tsx  → /about
+└── (dashboard)/
+    ├── layout.tsx    ← different layout for dashboard
+    └── settings/
+        └── page.tsx  → /settings
+```
+
+Route groups are useful for:
+
+- Applying different layouts to different sections without changing URLs
+- Organizing large codebases by feature or team
+- Creating multiple root layouts
+
+## Special files
+
+The App Router has several reserved file names:
+
+<CardGroup cols={2}>
+  <Card title="page.tsx" icon="file">
+    Makes a route segment publicly accessible. Receives `params` and `searchParams` props.
+  </Card>
+  <Card title="layout.tsx" icon="layout">
+    Shared UI that wraps child pages and layouts. Does not re-render on navigation.
+  </Card>
+  <Card title="loading.tsx" icon="loader">
+    Instant loading state shown while a route segment loads. Automatically wraps the segment in `<Suspense>`.
+  </Card>
+  <Card title="error.tsx" icon="alert-circle">
+    Error UI for a route segment. Must be a Client Component.
+  </Card>
+  <Card title="not-found.tsx" icon="search-x">
+    UI shown when `notFound()` is called inside a segment.
+  </Card>
+  <Card title="route.tsx" icon="route">
+    API endpoint for the segment. Equivalent to API Routes in the Pages Router.
+  </Card>
+</CardGroup>
+
+## Search params
+
+Access search parameters in a Server Component page via the `searchParams` prop:
+
+```tsx filename="app/page.tsx"
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const filters = (await searchParams).filters
+}
+```
+
+Using `searchParams` opts the page into dynamic rendering. In Client Components, use the `useSearchParams` hook instead.
+
+## Navigation
+
+Use the `<Link>` component for client-side navigation with automatic prefetching:
+
+```tsx filename="app/layout.tsx"
+import Link from 'next/link'
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <nav>
+          <Link href="/blog">Blog</Link>
+          <Link href="/about">About</Link>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+`<Link>` automatically prefetches routes when they enter the viewport:
+
+- **Static routes**: the full route is prefetched
+- **Dynamic routes**: prefetching is skipped or partial if `loading.tsx` is present
+
+### Programmatic navigation
+
+Use `useRouter` in Client Components for programmatic navigation:
+
+```tsx filename="app/ui/back-button.tsx"
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function BackButton() {
+  const router = useRouter()
+  return <button onClick={() => router.back()}>Go back</button>
+}
+```
+
+## Route type helpers
+
+Next.js generates utility types that infer `params` and named slots from your route structure:
+
+```tsx filename="app/blog/[slug]/page.tsx"
+export default async function Page(props: PageProps<'/blog/[slug]'>) {
+  const { slug } = await props.params
+  return <h1>Blog post: {slug}</h1>
+}
+```
+
+```tsx filename="app/dashboard/layout.tsx"
+export default function Layout(props: LayoutProps<'/dashboard'>) {
+  return <section>{props.children}</section>
+}
+```
+
+These types are globally available — no imports required. They're generated during `next dev`, `next build`, or `next typegen`.
+
+## Middleware
+
+Middleware runs before a request is completed and allows you to rewrite, redirect, or modify the request:
+
+```typescript filename="middleware.ts"
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // Redirect unauthenticated users
+  if (!request.cookies.get('token')) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: ['/dashboard/:path*'],
+}
+```
+
+Place `middleware.ts` at the root of your project (same level as `app/`). The `matcher` config controls which paths trigger the middleware.
+
+<Warning>
+  Middleware runs on every matched request. Keep it lightweight — avoid expensive operations like database queries.
+</Warning>

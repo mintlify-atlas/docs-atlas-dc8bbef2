@@ -1,0 +1,214 @@
+---
+title: Rendering
+description: Static Site Generation (SSG), Server-side Rendering (SSR), Incremental Static Regeneration (ISR), and client-side rendering in the Pages Router.
+---
+
+Next.js supports multiple rendering strategies per page. You choose a strategy by exporting specific functions from a page file.
+
+## Static Generation (SSG)
+
+With Static Generation, the page HTML is generated at **build time**. The HTML is reused on every request and can be cached by a CDN.
+
+### Without data
+
+Pages that do not export `getStaticProps` or `getServerSideProps` are automatically statically generated:
+
+```tsx pages/about.tsx
+export default function About() {
+  return <div>About</div>
+}
+```
+
+### With data
+
+Export `getStaticProps` to fetch data at build time:
+
+```tsx pages/blog.tsx
+import type { GetStaticProps, InferGetStaticPropsType } from 'next'
+
+type Post = { id: string; title: string }
+
+export const getStaticProps = (async () => {
+  const res = await fetch('https://api.example.com/posts')
+  const posts: Post[] = await res.json()
+  return { props: { posts } }
+}) satisfies GetStaticProps<{ posts: Post[] }>
+
+export default function Blog({
+  posts,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### When to use Static Generation
+
+Use Static Generation for content that can be built once and served to all users:
+
+- Marketing pages
+- Blog posts
+- Product listings
+- Documentation
+
+Ask yourself: can this page be prerendered before a user requests it? If yes, use Static Generation.
+
+## Server-side Rendering (SSR)
+
+With Server-side Rendering, the page HTML is generated on **every request**.
+
+Export `getServerSideProps` to opt a page into SSR:
+
+```tsx pages/dashboard.tsx
+import type { GetServerSideProps, InferGetServerSidePropsType } from 'next'
+
+type Repo = {
+  name: string
+  stargazers_count: number
+}
+
+export const getServerSideProps = (async () => {
+  const res = await fetch('https://api.github.com/repos/vercel/next.js')
+  const repo: Repo = await res.json()
+  return { props: { repo } }
+}) satisfies GetServerSideProps<{ repo: Repo }>
+
+export default function Page({
+  repo,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  return <p>Stars: {repo.stargazers_count}</p>
+}
+```
+
+### When to use SSR
+
+Use SSR when a page:
+
+- Displays personalized data (user profile, session-based content).
+- Depends on request-time information (cookies, headers, geolocation).
+- Shows data that changes too frequently to benefit from caching.
+
+<Note>
+SSR pages cannot be cached by a CDN at the page level. If you need caching, add `Cache-Control` headers in `getServerSideProps`, or consider using ISR instead.
+</Note>
+
+## Incremental Static Regeneration (ISR)
+
+ISR lets you update static pages after build time without rebuilding the entire site. Add a `revalidate` field to the return value of `getStaticProps`:
+
+```tsx pages/products/[id].tsx
+import type { GetStaticProps, GetStaticPaths, InferGetStaticPropsType } from 'next'
+
+type Product = { id: string; name: string; price: number }
+
+export const getStaticPaths = (async () => {
+  const res = await fetch('https://api.example.com/products')
+  const products: Product[] = await res.json()
+  return {
+    paths: products.map((p) => ({ params: { id: p.id } })),
+    fallback: 'blocking',
+  }
+}) satisfies GetStaticPaths
+
+export const getStaticProps = (async ({ params }) => {
+  const res = await fetch(`https://api.example.com/products/${params?.id}`)
+  const product: Product = await res.json()
+  return {
+    props: { product },
+    revalidate: 60, // regenerate at most once per minute
+  }
+}) satisfies GetStaticProps<{ product: Product }>
+
+export default function ProductPage({
+  product,
+}: InferGetStaticPropsType<typeof getStaticProps>) {
+  return <h1>{product.name}</h1>
+}
+```
+
+With `revalidate: 60`:
+
+1. The cached page is served immediately.
+2. If more than 60 seconds have passed since the last generation, Next.js regenerates the page in the background.
+3. The next request receives the freshly generated page.
+
+### On-demand revalidation
+
+You can trigger revalidation from an API route:
+
+```ts pages/api/revalidate.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const path = req.query.path as string
+  await res.revalidate(path)
+  return res.json({ revalidated: true })
+}
+```
+
+<Note>
+In the App Router, use [`revalidatePath`](/api-reference/functions/revalidate-path) and [`revalidateTag`](/api-reference/functions/revalidate-tag) from `next/cache` for on-demand revalidation.
+</Note>
+
+## Automatic Static Optimization
+
+Next.js automatically determines whether a page can be statically generated. If a page does not export `getServerSideProps` or `getInitialProps`, it is treated as static.
+
+The absence of blocking data requirements is what triggers this optimization.
+
+<Warning>
+Adding `getInitialProps` to your custom `_app.js` disables Automatic Static Optimization for all pages that do not use `getStaticProps`.
+</Warning>
+
+## Client-side rendering (CSR)
+
+For pages or components where you do not need server-rendered HTML, fetch data on the client.
+
+### Using `useEffect`
+
+```tsx pages/index.tsx
+import { useState, useEffect } from 'react'
+
+export default function Page() {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/data')
+      .then((res) => res.json())
+      .then(setData)
+  }, [])
+
+  return <p>{data ? JSON.stringify(data) : 'Loading...'}</p>
+}
+```
+
+### Using SWR
+
+[SWR](https://swr.vercel.app/) is the recommended library for client-side data fetching. It handles caching, revalidation, and more:
+
+```tsx pages/index.tsx
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+export default function Page() {
+  const { data, error, isLoading } = useSWR('/api/data', fetcher)
+
+  if (error) return <p>Failed to load.</p>
+  if (isLoading) return <p>Loading...</p>
+
+  return <p>Your data: {JSON.stringify(data)}</p>
+}
+```
+
+<Warning>
+CSR can affect SEO because the page is empty until JavaScript runs. For content that must be indexed, use Static Generation or SSR instead.
+</Warning>

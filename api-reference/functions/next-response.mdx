@@ -1,0 +1,161 @@
+---
+title: NextResponse
+description: API reference for the NextResponse class, which extends the Web Response API with helpers for redirects, rewrites, and cookie management in middleware.
+---
+
+`NextResponse` extends the native [Web `Response` API](https://developer.mozilla.org/docs/Web/API/Response) with additional convenience methods for use in [Middleware](/api-reference/file-conventions/route) and [Route Handlers](/api-reference/file-conventions/route).
+
+## Static methods
+
+### `NextResponse.json()`
+
+Creates a `Response` with a JSON body and sets the `Content-Type` header to `application/json`.
+
+```typescript app/api/route.ts
+import { NextResponse } from 'next/server'
+
+export async function GET(request: Request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+```
+
+<ParamField body="body" type="any" required>
+  The value to serialize as JSON.
+</ParamField>
+
+<ParamField body="init" type="ResponseInit">
+  Optional response options: `status`, `statusText`, `headers`.
+</ParamField>
+
+### `NextResponse.redirect()`
+
+Creates a response that redirects the user to a URL.
+
+```typescript
+import { NextResponse } from 'next/server'
+
+return NextResponse.redirect(new URL('/new', request.url))
+```
+
+You can modify the URL before redirecting:
+
+```typescript
+import { NextResponse } from 'next/server'
+
+const loginUrl = new URL('/login', request.url)
+loginUrl.searchParams.set('from', request.nextUrl.pathname)
+return NextResponse.redirect(loginUrl)
+```
+
+<ParamField body="url" type="string | URL" required>
+  The destination URL.
+</ParamField>
+
+<ParamField body="init" type="ResponseInit">
+  Optional response options (e.g. `{ status: 308 }` for permanent redirect).
+</ParamField>
+
+### `NextResponse.rewrite()`
+
+Creates a response that rewrites (proxies) the request to a given URL while keeping the original URL in the browser address bar.
+
+```typescript
+import { NextResponse } from 'next/server'
+
+// Browser shows /about, but content is served from /proxy
+return NextResponse.rewrite(new URL('/proxy', request.url))
+```
+
+<ParamField body="url" type="string | URL" required>
+  The URL to proxy the request to.
+</ParamField>
+
+### `NextResponse.next()`
+
+Continues to the next middleware or route handler without modifying the response. Useful in middleware when you want to pass through with optional header modifications.
+
+```typescript
+import { NextResponse } from 'next/server'
+
+return NextResponse.next()
+```
+
+To forward modified request headers **upstream** (to the page/route handler, not to the client):
+
+```typescript
+import { NextResponse } from 'next/server'
+
+const newHeaders = new Headers(request.headers)
+newHeaders.set('x-version', '123')
+
+return NextResponse.next({
+  request: { headers: newHeaders },
+})
+```
+
+<Warning>
+  Avoid using `NextResponse.next({ headers })` (the shorthand form) to send response headers to the client — it can override framework expectations (e.g. `Content-Type` for Server Actions) and leak sensitive data. Use `NextResponse.next({ request: { headers } })` to forward request headers upstream only.
+</Warning>
+
+## `cookies`
+
+Read or mutate the `Set-Cookie` header of the response.
+
+<ResponseField name="get(name)" type="{ name: string; value: string } | undefined">
+  Returns the first cookie with the given name.
+
+  ```typescript
+  response.cookies.get('show-banner')
+  ```
+</ResponseField>
+
+<ResponseField name="getAll(name?)" type="{ name: string; value: string }[]">
+  Returns all cookies with the given name, or all cookies if no name is provided.
+
+  ```typescript
+  response.cookies.getAll('experiments')
+  ```
+</ResponseField>
+
+<ResponseField name="set(name, value)" type="void">
+  Sets a cookie on the response.
+
+  ```typescript
+  response.cookies.set('show-banner', 'false')
+  ```
+</ResponseField>
+
+<ResponseField name="has(name)" type="boolean">
+  Returns `true` if the cookie exists on the response.
+
+  ```typescript
+  response.cookies.has('experiments')
+  ```
+</ResponseField>
+
+<ResponseField name="delete(name)" type="boolean">
+  Deletes the cookie from the response. Returns `true` if deleted.
+
+  ```typescript
+  response.cookies.delete('experiments')
+  ```
+</ResponseField>
+
+## Example: middleware with auth check
+
+```typescript middleware.ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const session = request.cookies.get('session')
+
+  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  const response = NextResponse.next()
+  // Set a cookie on the response
+  response.cookies.set('last-visited', request.nextUrl.pathname)
+  return response
+}
+```

@@ -1,0 +1,349 @@
+---
+title: Fonts
+description: Optimize fonts in your Next.js application with next/font for automatic self-hosting and zero layout shift.
+---
+
+The `next/font` module automatically optimizes your fonts and removes external network requests for improved privacy and performance. It includes **built-in self-hosting** for any font file, meaning you can load web fonts with no layout shift.
+
+## Google fonts
+
+Any Google Font is automatically self-hosted. Fonts are stored as static assets and served from the same domain as your deployment—no requests are made to Google from the browser.
+
+Import your chosen font from `next/font/google` and call it as a function:
+
+<CodeGroup>
+
+```tsx app/layout.tsx
+import { Geist } from 'next/font/google'
+
+const geist = Geist({
+  subsets: ['latin'],
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en" className={geist.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import { Geist } from 'next/font/google'
+
+const geist = Geist({
+  subsets: ['latin'],
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={geist.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+<Tip>
+Use [variable fonts](https://fonts.google.com/variablefonts) for the best performance and flexibility. They support multiple weights and styles in a single file.
+</Tip>
+
+### Non-variable fonts
+
+For fonts that don't have a variable version, specify the `weight`:
+
+<CodeGroup>
+
+```tsx app/layout.tsx
+import { Roboto } from 'next/font/google'
+
+const roboto = Roboto({
+  weight: '400',
+  subsets: ['latin'],
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en" className={roboto.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import { Roboto } from 'next/font/google'
+
+const roboto = Roboto({
+  weight: '400',
+  subsets: ['latin'],
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={roboto.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+## Local fonts
+
+Use `localFont` from `next/font/local` to load a custom font file. The `src` path is resolved relative to the file where `localFont` is called:
+
+<CodeGroup>
+
+```tsx app/layout.tsx
+import localFont from 'next/font/local'
+
+const myFont = localFont({
+  src: './fonts/my-font.woff2',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en" className={myFont.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import localFont from 'next/font/local'
+
+const myFont = localFont({
+  src: './fonts/my-font.woff2',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={myFont.className}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+To define multiple files for a single font family, pass an array to `src`:
+
+```js
+const roboto = localFont({
+  src: [
+    {
+      path: './Roboto-Regular.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: './Roboto-Italic.woff2',
+      weight: '400',
+      style: 'italic',
+    },
+    {
+      path: './Roboto-Bold.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+    {
+      path: './Roboto-BoldItalic.woff2',
+      weight: '700',
+      style: 'italic',
+    },
+  ],
+})
+```
+
+## Font variables
+
+Use a CSS variable to apply a font via Tailwind CSS or custom CSS, instead of using the `className` directly:
+
+<CodeGroup>
+
+```tsx app/layout.tsx
+import { Geist, Geist_Mono } from 'next/font/google'
+
+const geistSans = Geist({
+  subsets: ['latin'],
+  variable: '--font-geist-sans',
+})
+
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  variable: '--font-geist-mono',
+})
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import { Geist, Geist_Mono } from 'next/font/google'
+
+const geistSans = Geist({
+  subsets: ['latin'],
+  variable: '--font-geist-sans',
+})
+
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  variable: '--font-geist-mono',
+})
+
+export default function RootLayout({ children }) {
+  return (
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+Then reference the variable in your CSS:
+
+```css app/globals.css
+body {
+  font-family: var(--font-geist-sans);
+}
+
+code {
+  font-family: var(--font-geist-mono);
+}
+```
+
+## Options reference
+
+### next/font/google options
+
+<ParamField path="subsets" type="string[]" required>
+  The Unicode subsets to preload. Specify the subset(s) your application uses to reduce the initial font file size.
+
+  Example: `['latin']`, `['latin', 'latin-ext']`
+</ParamField>
+
+<ParamField path="weight" type="string | string[]">
+  The font weight(s) to include. Required for non-variable fonts. Use `'variable'` to load the variable font.
+
+  Example: `'400'`, `['400', '700']`, `'variable'`
+</ParamField>
+
+<ParamField path="style" type="string | string[]" default="'normal'">
+  The font style(s) to include.
+
+  Example: `'normal'`, `'italic'`, `['normal', 'italic']`
+</ParamField>
+
+<ParamField path="display" type="string" default="'swap'">
+  The CSS `font-display` property. Controls the font loading behavior.
+
+  Values: `'auto'`, `'block'`, `'swap'`, `'fallback'`, `'optional'`
+</ParamField>
+
+<ParamField path="variable" type="string">
+  A CSS custom property name for the font (e.g. `'--font-sans'`). When provided, the function returns a `NextFontWithVariable` object with a `variable` string in addition to `className` and `style`.
+</ParamField>
+
+<ParamField path="preload" type="boolean" default="true">
+  Whether to preload the font. Set to `false` to prevent generating a `<link rel="preload">` tag.
+</ParamField>
+
+<ParamField path="fallback" type="string[]">
+  Fallback font families to use if the custom font fails to load.
+
+  Example: `['system-ui', 'sans-serif']`
+</ParamField>
+
+<ParamField path="adjustFontFallback" type="boolean" default="true">
+  Whether to generate an automatic fallback font with adjusted metrics to reduce Cumulative Layout Shift.
+</ParamField>
+
+<ParamField path="axes" type="string[]">
+  Additional variable font axes to include. Only available for variable fonts that support extra axes.
+</ParamField>
+
+### next/font/local options
+
+<ParamField path="src" type="string | object[]" required>
+  The path to the font file relative to the file calling `localFont`, or an array of objects with `path`, `weight`, and `style` for multiple font files.
+</ParamField>
+
+<ParamField path="display" type="string" default="'swap'">
+  The CSS `font-display` property. Values: `'auto'`, `'block'`, `'swap'`, `'fallback'`, `'optional'`.
+</ParamField>
+
+<ParamField path="variable" type="string">
+  A CSS custom property name (e.g. `'--font-custom'`) returned as the `variable` property.
+</ParamField>
+
+<ParamField path="preload" type="boolean" default="true">
+  Whether to generate a `<link rel="preload">` tag for this font.
+</ParamField>
+
+<ParamField path="fallback" type="string[]">
+  Fallback font families.
+</ParamField>
+
+<ParamField path="adjustFontFallback" type="boolean | string" default="'Arial'">
+  A fallback font to use for metrics adjustment (`'Arial'` or `'Times New Roman'`), or `false` to disable.
+</ParamField>
+
+## Scoping fonts
+
+Fonts are scoped to the component they are used in. To apply a font to the entire application, add it to the root layout. To apply a font to a section, add it to the layout for that segment:
+
+```tsx app/dashboard/layout.tsx
+import { Roboto_Mono } from 'next/font/google'
+
+const robotoMono = Roboto_Mono({
+  subsets: ['latin'],
+})
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className={robotoMono.className}>
+      {children}
+    </div>
+  )
+}
+```

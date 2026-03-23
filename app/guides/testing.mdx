@@ -1,0 +1,371 @@
+---
+title: Testing
+description: Learn how to set up unit, component, and end-to-end testing in your Next.js application with Jest, Vitest, Playwright, and Cypress.
+---
+
+Next.js supports several testing approaches, each serving different purposes:
+
+| Type | Purpose | Recommended tools |
+|------|---------|-------------------|
+| Unit | Test individual functions, hooks, or components in isolation | Jest, Vitest |
+| Component | Test React component rendering and interactions | Jest + RTL, Vitest + RTL |
+| Integration | Test how multiple units work together | Jest, Vitest |
+| End-to-end | Test real user flows in a browser environment | Playwright, Cypress |
+| Snapshot | Capture rendered output to catch unexpected UI changes | Jest, Vitest |
+
+<Note>
+  `async` Server Components are new to the React ecosystem and not fully supported by Jest or Vitest for unit testing. Use **end-to-end testing** for async Server Components.
+</Note>
+
+## Jest
+
+Jest and React Testing Library are the standard for unit and snapshot testing in Next.js.
+
+### Setup
+
+<Tabs>
+  <Tab title="Quickstart">
+    Use `create-next-app` with the Jest example:
+
+    ```bash
+    npx create-next-app@latest --example with-jest with-jest-app
+    ```
+  </Tab>
+  <Tab title="Manual">
+    Install the required packages:
+
+    ```bash
+    npm install -D jest jest-environment-jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom ts-node @types/jest
+    ```
+
+    Generate a Jest config file:
+
+    ```bash
+    npm init jest@latest
+    ```
+
+    Update the generated config to use `next/jest`:
+
+    ```ts filename="jest.config.ts"
+    import type { Config } from 'jest'
+    import nextJest from 'next/jest.js'
+
+    const createJestConfig = nextJest({
+      // Path to your Next.js app to load next.config.js and .env files
+      dir: './',
+    })
+
+    const config: Config = {
+      coverageProvider: 'v8',
+      testEnvironment: 'jsdom',
+      // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+    }
+
+    export default createJestConfig(config)
+    ```
+
+    `next/jest` automatically handles:
+    - Transforms via the Next.js Compiler
+    - Auto-mocking CSS, image imports, and `next/font`
+    - Loading `.env` files into `process.env`
+    - Ignoring `node_modules` and `.next` from test resolving
+  </Tab>
+</Tabs>
+
+### Custom matchers
+
+Add `@testing-library/jest-dom` custom matchers like `.toBeInTheDocument()`:
+
+```ts filename="jest.config.ts"
+setupFilesAfterEnv: ['<rootDir>/jest.setup.ts']
+```
+
+```ts filename="jest.setup.ts"
+import '@testing-library/jest-dom'
+```
+
+### Writing tests
+
+Add test scripts to `package.json`:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  }
+}
+```
+
+Create a `__tests__` directory in your project root and write your first test:
+
+```tsx filename="__tests__/page.test.tsx"
+import '@testing-library/jest-dom'
+import { render, screen } from '@testing-library/react'
+import Page from '../app/page'
+
+describe('Page', () => {
+  it('renders a heading', () => {
+    render(<Page />)
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading).toBeInTheDocument()
+  })
+})
+```
+
+Add a snapshot test to catch unexpected UI changes:
+
+```tsx filename="__tests__/snapshot.test.tsx"
+import { render } from '@testing-library/react'
+import Page from '../app/page'
+
+it('renders homepage unchanged', () => {
+  const { container } = render(<Page />)
+  expect(container).toMatchSnapshot()
+})
+```
+
+### Module path aliases
+
+If you use path aliases in `tsconfig.json`, configure `moduleNameMapper` in Jest:
+
+```json filename="tsconfig.json"
+{
+  "compilerOptions": {
+    "paths": {
+      "@/components/*": ["components/*"]
+    }
+  }
+}
+```
+
+```js filename="jest.config.js"
+moduleNameMapper: {
+  '^@/components/(.*)$': '<rootDir>/components/$1',
+}
+```
+
+## Vitest
+
+Vitest offers faster execution and native ESM support, making it a good alternative to Jest.
+
+### Setup
+
+<Tabs>
+  <Tab title="Quickstart">
+    ```bash
+    npx create-next-app@latest --example with-vitest with-vitest-app
+    ```
+  </Tab>
+  <Tab title="Manual">
+    Install packages:
+
+    ```bash
+    # TypeScript
+    npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom vite-tsconfig-paths
+    ```
+
+    Create a config file:
+
+    ```ts filename="vitest.config.mts"
+    import { defineConfig } from 'vitest/config'
+    import react from '@vitejs/plugin-react'
+    import tsconfigPaths from 'vite-tsconfig-paths'
+
+    export default defineConfig({
+      plugins: [tsconfigPaths(), react()],
+      test: {
+        environment: 'jsdom',
+      },
+    })
+    ```
+
+    Add a test script:
+
+    ```json filename="package.json"
+    {
+      "scripts": {
+        "test": "vitest"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Writing Vitest tests
+
+```tsx filename="__tests__/page.test.tsx"
+import { expect, test } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import Page from '../app/page'
+
+test('Page', () => {
+  render(<Page />)
+  expect(screen.getByRole('heading', { level: 1, name: 'Home' })).toBeDefined()
+})
+```
+
+Vitest watches for changes by default when you run `npm run test`.
+
+## Playwright
+
+Playwright enables end-to-end testing across Chromium, Firefox, and WebKit.
+
+### Setup
+
+<Tabs>
+  <Tab title="Quickstart">
+    ```bash
+    npx create-next-app@latest --example with-playwright with-playwright-app
+    ```
+  </Tab>
+  <Tab title="Manual">
+    ```bash
+    npm init playwright
+    ```
+
+    This creates a `playwright.config.ts` and walks you through setup.
+  </Tab>
+</Tabs>
+
+### Writing E2E tests
+
+Create pages to test:
+
+```tsx filename="app/page.tsx"
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <Link href="/about">About</Link>
+    </div>
+  )
+}
+```
+
+Write a test to verify navigation:
+
+```ts filename="tests/example.spec.ts"
+import { test, expect } from '@playwright/test'
+
+test('should navigate to the about page', async ({ page }) => {
+  await page.goto('http://localhost:3000/')
+  await page.click('text=About')
+  await expect(page).toHaveURL('http://localhost:3000/about')
+  await expect(page.locator('h1')).toContainText('About')
+})
+```
+
+### Running Playwright tests
+
+Build and start your app, then run tests:
+
+```bash
+npm run build && npm run start
+npx playwright test
+```
+
+For CI, install browser dependencies first:
+
+```bash
+npx playwright install-deps
+```
+
+## Cypress
+
+Cypress supports both end-to-end and component testing.
+
+### Setup
+
+<Tabs>
+  <Tab title="Quickstart">
+    ```bash
+    npx create-next-app@latest --example with-cypress with-cypress-app
+    ```
+  </Tab>
+  <Tab title="Manual">
+    ```bash
+    npm install -D cypress
+    ```
+
+    Add scripts to `package.json`:
+
+    ```json filename="package.json"
+    {
+      "scripts": {
+        "cypress:open": "cypress open"
+      }
+    }
+    ```
+
+    Run Cypress to initialize the configuration:
+
+    ```bash
+    npm run cypress:open
+    ```
+  </Tab>
+</Tabs>
+
+### Writing Cypress E2E tests
+
+```js filename="cypress/e2e/app.cy.js"
+describe('Navigation', () => {
+  it('should navigate to the about page', () => {
+    cy.visit('http://localhost:3000/')
+    cy.get('a[href*="about"]').click()
+    cy.url().should('include', '/about')
+    cy.get('h1').contains('About')
+  })
+})
+```
+
+Run tests against your production build:
+
+```bash
+npm run build && npm run start
+npm run cypress:open
+```
+
+### Cypress component tests
+
+Cypress can also mount and test individual React components without a running server:
+
+```ts filename="cypress.config.ts"
+import { defineConfig } from 'cypress'
+
+export default defineConfig({
+  component: {
+    devServer: {
+      framework: 'next',
+      bundler: 'webpack',
+    },
+  },
+})
+```
+
+```tsx filename="cypress/component/about.cy.tsx"
+import Page from '../../app/page'
+
+describe('<Page />', () => {
+  it('should render and display expected content', () => {
+    cy.mount(<Page />)
+    cy.get('h1').contains('Home')
+    cy.get('a[href="/about"]').should('be.visible')
+  })
+})
+```
+
+### CI configuration
+
+Run Cypress headlessly in CI:
+
+```json filename="package.json"
+{
+  "scripts": {
+    "e2e:headless": "start-server-and-test dev http://localhost:3000 \"cypress run --e2e\"",
+    "component:headless": "cypress run --component"
+  }
+}
+```

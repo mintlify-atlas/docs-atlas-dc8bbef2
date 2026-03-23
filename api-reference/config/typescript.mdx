@@ -1,0 +1,248 @@
+---
+title: TypeScript
+description: Next.js provides a TypeScript-first development experience, including automatic configuration, type-safe navigation, IDE plugin, and typed environment variables.
+---
+
+Next.js has built-in TypeScript support. When you create a project with `create-next-app`, TypeScript is configured automatically. To add TypeScript to an existing project, rename any file to `.ts` or `.tsx` and run `next dev`—Next.js will install the required dependencies and create a `tsconfig.json` with recommended settings.
+
+## tsconfig.json
+
+The following is the recommended `tsconfig.json` for a Next.js App Router project:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": ["node_modules"]
+}
+```
+
+<Note>
+Do not modify `next-env.d.ts` — it is regenerated automatically each time you run `next dev`, `next build`, or `next typegen`. Add it to `.gitignore`.
+</Note>
+
+## TypeScript plugin
+
+Next.js includes a custom TypeScript plugin and type checker that VSCode and other editors can use for advanced type-checking and auto-completion.
+
+Enable it in VS Code:
+
+<Steps>
+  <Step title="Open the command palette">
+    Press `Ctrl/⌘ + Shift + P`.
+  </Step>
+  <Step title="Select TypeScript version">
+    Search for **TypeScript: Select TypeScript Version**.
+  </Step>
+  <Step title="Use workspace version">
+    Select **Use Workspace Version**.
+  </Step>
+</Steps>
+
+The plugin helps with:
+
+- Warning when invalid values are passed to segment config options
+- Showing available options and in-context documentation
+- Ensuring the `'use client'` directive is used correctly
+- Ensuring client hooks (like `useState`) are only used in Client Components
+
+## Automatic type generation
+
+Running `next dev`, `next build`, or `next typegen` generates a `next-env.d.ts` file that references Next.js type definitions and a hidden `.next/types` directory with route type definitions.
+
+The `next typegen` command lets you generate types without running a full build:
+
+```bash
+next typegen
+```
+
+This is useful for CI type-checking:
+
+```bash
+next typegen && tsc --noEmit
+```
+
+## Statically typed links
+
+Next.js can statically type `href` values in `next/link` and navigation methods in `next/navigation`, preventing broken links at compile time.
+
+Enable `typedRoutes` in your config:
+
+```ts next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    typedRoutes: true,
+  },
+}
+
+export default nextConfig
+```
+
+Add `.next/types/**/*.ts` to your `tsconfig.json` `include` array (done automatically by `create-next-app`):
+
+```json tsconfig.json
+{
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ]
+}
+```
+
+Usage:
+
+```tsx app/example-client.tsx
+'use client'
+
+import type { Route } from 'next'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
+export default function Example() {
+  const router = useRouter()
+
+  return (
+    <>
+      {/* Literal href is validated */}
+      <Link href="/about" />
+
+      {/* TypeScript error: /aboot is not a valid route */}
+      <Link href="/aboot" />
+
+      {/* Cast non-literal strings with `as Route` */}
+      <Link href={('/blog/' + slug) as Route} />
+
+      <button onClick={() => router.push('/contact')}>Go</button>
+    </>
+  )
+}
+```
+
+## Type-safe environment variables
+
+Next.js can generate TypeScript types for your environment variables, enabling IntelliSense for `process.env` in your editor.
+
+```ts next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    typedEnv: true,
+  },
+}
+
+export default nextConfig
+```
+
+Types are generated from the environment variables loaded at development runtime.
+
+## End-to-end type safety
+
+The App Router supports end-to-end type safety for data fetching. Because Server Components run on the server, data returned from `fetch` does not need to be serialized, and you can use `Date`, `Map`, `Set`, and other non-JSON types directly:
+
+```tsx app/page.tsx
+async function getData() {
+  const res = await fetch('https://api.example.com/data')
+  return res.json()
+}
+
+export default async function Page() {
+  const data = await getData()
+  return <main>{data.title}</main>
+}
+```
+
+## TypeScript configuration in next.config.js
+
+Use `next.config.ts` to get TypeScript type-checking in your config file:
+
+```ts next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  typescript: {
+    // Skip type-checking during production builds (dangerous—ensure CI runs tsc separately)
+    ignoreBuildErrors: false,
+    // Path to a custom tsconfig, e.g. for build-specific settings
+    tsconfigPath: 'tsconfig.build.json',
+  },
+}
+
+export default nextConfig
+```
+
+<ParamField path="typescript.ignoreBuildErrors" type="boolean" default="false">
+  When `true`, Next.js will not fail `next build` due to TypeScript errors. Run `tsc --noEmit` separately in CI to catch errors.
+</ParamField>
+
+<ParamField path="typescript.tsconfigPath" type="string">
+  Relative path to an alternate `tsconfig.json` file used during `next dev`, `next build`, and `next typegen`.
+</ParamField>
+
+## Custom type declarations
+
+Do not modify `next-env.d.ts` — it is overwritten on every build. Create a separate declaration file instead and reference it in `tsconfig.json`:
+
+```json tsconfig.json
+{
+  "include": [
+    "my-types.d.ts",
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ]
+}
+```
+
+## Node.js native TypeScript resolver
+
+On Node.js v22.10.0+, Next.js detects the native TypeScript resolver via `process.features.typescript`. When present, `next.config.ts` can use native ESM including top-level `await`.
+
+For CommonJS projects targeting Node.js v22.10.0–v22.17.x, opt in with:
+
+```bash
+NODE_OPTIONS=--experimental-transform-types next build
+```
+
+On Node.js v22.18.0+, this is enabled by default.
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v15.0.0` | `next.config.ts` support added |
+| `v13.2.0` | Statically typed links available in beta |
+| `v12.0.0` | SWC used by default to compile TypeScript for faster builds |
+| `v10.2.1` | Incremental type checking support added |

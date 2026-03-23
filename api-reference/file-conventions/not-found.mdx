@@ -1,0 +1,159 @@
+---
+title: "not-found.js"
+description: "API reference for not-found.js and global-not-found.js. Used to render custom 404 UI when notFound() is called or when a URL does not match any route."
+---
+
+Next.js provides two conventions for 404 pages:
+
+- **`not-found.js`** — rendered when `notFound()` is called within a route segment
+- **`global-not-found.js`** — a global 404 page for unmatched URLs across the entire app (experimental)
+
+## `not-found.js`
+
+When `notFound()` is called inside a route segment, Next.js renders the nearest `not-found.js` file as the response UI.
+
+```jsx app/not-found.js
+import Link from 'next/link'
+
+export default function NotFound() {
+  return (
+    <div>
+      <h2>Not Found</h2>
+      <p>Could not find requested resource</p>
+      <Link href="/">Return Home</Link>
+    </div>
+  )
+}
+```
+
+<Note>
+  The root `app/not-found.js` also handles any unmatched URL for the entire application. Users visiting a URL not handled by your app see this component.
+</Note>
+
+## Props
+
+`not-found.js` components do not accept any props.
+
+## Triggering not-found
+
+Call `notFound()` from `next/navigation` to trigger the not-found UI:
+
+```jsx app/blog/[slug]/page.js
+import { notFound } from 'next/navigation'
+import { getPost } from '@/lib/posts'
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  const post = await getPost(slug)
+
+  if (!post) {
+    notFound() // renders the nearest not-found.js
+  }
+
+  return <h1>{post.title}</h1>
+}
+```
+
+## `global-not-found.js` (experimental)
+
+The `global-not-found.js` file handles 404s at the routing level, before any layout or page is rendered. Next.js skips normal rendering and returns this global page directly.
+
+Useful when:
+- Your app has multiple root layouts (e.g., `app/(admin)/layout.tsx` and `app/(shop)/layout.tsx`) with no single layout to compose a global 404 from
+- Your root layout uses top-level dynamic segments (e.g., `app/[country]/layout.tsx`)
+
+Enable in `next.config.ts`:
+
+```tsx next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    globalNotFound: true,
+  },
+}
+
+export default nextConfig
+```
+
+Create `app/global-not-found.js`. Unlike `not-found.js`, this file must return a full HTML document:
+
+```jsx app/global-not-found.js
+import './globals.css'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata = {
+  title: '404 - Page Not Found',
+}
+
+export default function GlobalNotFound() {
+  return (
+    <html lang="en" className={inter.className}>
+      <body>
+        <h1>404 - Page Not Found</h1>
+        <p>This page does not exist.</p>
+      </body>
+    </html>
+  )
+}
+```
+
+## Examples
+
+### Fetching data in not-found
+
+`not-found.js` is a Server Component by default. Mark it `async` to fetch data:
+
+```jsx app/not-found.js
+import Link from 'next/link'
+import { headers } from 'next/headers'
+
+export default async function NotFound() {
+  const headersList = await headers()
+  const domain = headersList.get('host')
+  const data = await getSiteData(domain)
+
+  return (
+    <div>
+      <h2>Not Found: {data.name}</h2>
+      <p>Could not find requested resource</p>
+      <Link href="/blog">View all posts</Link>
+    </div>
+  )
+}
+```
+
+### Custom metadata for not-found pages
+
+For `global-not-found.js`, export a `metadata` object or `generateMetadata` function:
+
+```tsx app/global-not-found.tsx
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Not Found',
+  description: 'The page you are looking for does not exist.',
+}
+
+export default function GlobalNotFound() {
+  return (
+    <html lang="en">
+      <body>
+        <h1>Not Found</h1>
+      </body>
+    </html>
+  )
+}
+```
+
+<Note>Next.js automatically injects `<meta name="robots" content="noindex" />` for 404 pages.</Note>
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.4.0` | `global-not-found.js` introduced (experimental) |
+| `v13.3.0` | Root `app/not-found` handles global unmatched URLs |
+| `v13.0.0` | `not-found` introduced |

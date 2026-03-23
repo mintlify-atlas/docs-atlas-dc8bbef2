@@ -1,0 +1,136 @@
+---
+title: Edge Runtime
+description: "API reference for the Next.js Edge Runtime: supported APIs, restrictions, and how to use it in Middleware and Route Handlers."
+---
+
+Next.js provides two server runtimes:
+
+- **Node.js Runtime** (default): full Node.js API surface, used for rendering and route handlers.
+- **Edge Runtime**: a subset of Web APIs, optimized for low-latency responses at the edge. Used in [Middleware](/api-reference/file-conventions/middleware).
+
+## Choosing a runtime
+
+| | Node.js | Edge |
+|---|---|---|
+| Cold start | Slower | Faster |
+| Node.js APIs | Full | None |
+| `node_modules` | All | ES Modules only (no native addons) |
+| Streaming | Yes | Yes |
+| ISR | Yes | No |
+
+## Setting the runtime
+
+Specify the runtime in a Route Handler or layout/page segment using the `runtime` export:
+
+```ts app/api/route.ts
+export const runtime = 'edge'
+```
+
+The value must be `'edge'` or `'nodejs'`. When omitted, the Node.js runtime is used.
+
+<Note>
+ISR (Incremental Static Regeneration) is not supported in the Edge Runtime.
+</Note>
+
+## Supported APIs
+
+### Network APIs
+
+| API | Description |
+|---|---|
+| `Blob` | Represents a blob |
+| `fetch` | Fetches a resource |
+| `FetchEvent` | Represents a fetch event |
+| `File` | Represents a file |
+| `FormData` | Represents form data |
+| `Headers` | Represents HTTP headers |
+| `Request` | Represents an HTTP request |
+| `Response` | Represents an HTTP response |
+| `URLSearchParams` | Represents URL search parameters |
+| `WebSocket` | Represents a WebSocket connection |
+
+### Encoding APIs
+
+| API | Description |
+|---|---|
+| `atob` | Decodes a base-64 encoded string |
+| `btoa` | Encodes a string in base-64 |
+| `TextDecoder` | Decodes a `Uint8Array` into a string |
+| `TextDecoderStream` | Chainable decoder for streams |
+| `TextEncoder` | Encodes a string into a `Uint8Array` |
+| `TextEncoderStream` | Chainable encoder for streams |
+
+### Stream APIs
+
+| API | Description |
+|---|---|
+| `ReadableStream` | Represents a readable stream |
+| `ReadableStreamBYOBReader` | Reader for a `ReadableStream` |
+| `ReadableStreamDefaultReader` | Default reader for a `ReadableStream` |
+| `TransformStream` | Represents a transform stream |
+| `WritableStream` | Represents a writable stream |
+| `WritableStreamDefaultWriter` | Writer for a `WritableStream` |
+
+### Crypto APIs
+
+| API | Description |
+|---|---|
+| `crypto` | Access to platform cryptographic functions |
+| `CryptoKey` | Represents a cryptographic key |
+| `SubtleCrypto` | Low-level cryptographic primitives (hashing, signing, encryption) |
+
+### Web Standard APIs
+
+All standard JavaScript globals are available: `Array`, `ArrayBuffer`, `Boolean`, `Date`, `Error`, `JSON`, `Map`, `Math`, `Number`, `Object`, `Promise`, `Proxy`, `RegExp`, `Set`, `String`, `Symbol`, `URL`, `URLPattern`, `URLSearchParams`, `WeakMap`, `WeakSet`, `WebAssembly`, timer functions (`clearInterval`, `clearTimeout`, `setInterval`, `setTimeout`), encoding helpers (`decodeURI`, `decodeURIComponent`, `encodeURI`, `encodeURIComponent`), typed arrays, `AbortController`, `console`, `DOMException`, `queueMicrotask`, `structuredClone`, and more.
+
+### Next.js polyfills
+
+- `AsyncLocalStorage` (Node.js `async_hooks` API)
+
+### Environment variables
+
+```ts
+const value = process.env.MY_VAR
+```
+
+`process.env` is available in both `next dev` and `next build`.
+
+## Unsupported APIs
+
+The following are **not available** in the Edge Runtime:
+
+- Native Node.js APIs (filesystem, `crypto` module, `Buffer`, etc.)
+- CommonJS `require()` — use ES module `import` instead
+- `node_modules` packages that use native Node.js APIs
+
+The following JavaScript features are also disabled:
+
+| API | Description |
+|---|---|
+| `eval` | Evaluates a JavaScript string as code |
+| `new Function(code)` | Creates a function from a string |
+| `WebAssembly.compile` | Compiles a WASM module from a buffer |
+| `WebAssembly.instantiate` | Compiles and instantiates a WASM module from a buffer |
+
+## Allowing dynamic code evaluation
+
+In rare cases where code contains unreachable dynamic evaluation, you can suppress the build error using `unstable_allowDynamic` in your Proxy config:
+
+```ts proxy.ts
+export const config = {
+  unstable_allowDynamic: [
+    '/lib/utilities.js',
+    '**/node_modules/function-bind/**',
+  ],
+}
+```
+
+<Warning>
+If the allowed statements are executed at runtime on the Edge, they will throw a runtime error. Use `unstable_allowDynamic` only for code paths that are guaranteed not to execute.
+</Warning>
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v12.0.0` | Edge Runtime introduced |

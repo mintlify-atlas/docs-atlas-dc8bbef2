@@ -1,0 +1,64 @@
+---
+title: useParams
+description: API reference for the useParams hook, used to read dynamic route parameters in Client Components.
+---
+
+`useParams` is a **Client Component** hook that lets you read a route's [dynamic parameters](/app/core-concepts/routing) as filled in by the current URL.
+
+```typescript app/example-client-component.tsx
+'use client'
+
+import { useParams } from 'next/navigation'
+
+export default function ExampleClientComponent() {
+  const params = useParams<{ tag: string; item: string }>()
+
+  // Route -> /shop/[tag]/[item]
+  // URL   -> /shop/shoes/nike-air-max-97
+  // params -> { tag: 'shoes', item: 'nike-air-max-97' }
+  console.log(params)
+
+  return '...'
+}
+```
+
+## Parameters
+
+`useParams` takes no parameters.
+
+## Returns
+
+An object containing the current route's filled-in dynamic segments.
+
+- Each key is a dynamic segment name.
+- Each value is a `string` (for `[param]`) or `string[]` (for `[...param]`).
+- Returns an empty object `{}` if the route has no dynamic segments.
+- Returns `null` when used in the Pages Router before the router is ready.
+
+| Route | URL | `useParams()` |
+| --- | --- | --- |
+| `app/shop/page.js` | `/shop` | `{}` |
+| `app/shop/[slug]/page.js` | `/shop/1` | `{ slug: '1' }` |
+| `app/shop/[tag]/[item]/page.js` | `/shop/1/2` | `{ tag: '1', item: '2' }` |
+| `app/shop/[...slug]/page.js` | `/shop/1/2` | `{ slug: ['1', '2'] }` |
+
+## Example
+
+```typescript app/product/[id]/edit/page.tsx
+'use client'
+
+import { useParams } from 'next/navigation'
+
+export default function EditPage() {
+  // For route /product/[id]/edit with URL /product/abc123/edit
+  const { id } = useParams<{ id: string }>()
+
+  return <p>Editing product: {id}</p>
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v13.3.0` | `useParams` introduced. |

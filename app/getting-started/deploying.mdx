@@ -1,0 +1,111 @@
+---
+title: Deploying
+description: Learn how to deploy your Next.js application as a Node.js server, Docker container, static export, or using a platform adapter.
+---
+
+Next.js can be deployed as a Node.js server, Docker container, static export, or adapted to run on different platforms.
+
+| Deployment option | Feature support |
+| ----------------- | --------------- |
+| Node.js server    | All features |
+| Docker container  | All features |
+| Static export     | Limited (no server-required features) |
+| Adapters          | Platform-specific |
+
+## Node.js server
+
+Next.js can be deployed to any hosting provider that supports Node.js. Ensure your `package.json` has the `build` and `start` scripts:
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+Then run `npm run build` to build your application and `npm run start` to start the Node.js server. This server supports all Next.js features.
+
+Node.js deployments support the full Next.js feature set. See the [self-hosting guide](/app/guides/self-hosting) for infrastructure configuration details.
+
+### Deployment templates
+
+- [Flightcontrol](https://github.com/nextjs/deploy-flightcontrol)
+- [Railway](https://github.com/nextjs/deploy-railway)
+- [Replit](https://github.com/nextjs/deploy-replit)
+- [Hostinger](https://github.com/hostinger/deploy-nextjs)
+
+## Docker
+
+Next.js can be deployed to any provider that supports [Docker](https://www.docker.com/) containers, including Kubernetes and cloud providers that run Docker.
+
+Docker deployments support the full Next.js feature set. See the [self-hosting guide](/app/guides/self-hosting) for infrastructure configuration details.
+
+<Note>
+  For development on Mac and Windows, use local development (`npm run dev`) rather than Docker for better performance. See the [local development guide](/app/guides/debugging).
+</Note>
+
+### Dockerfile templates
+
+The following examples demonstrate best practices for containerizing Next.js applications:
+
+- **[Docker Standalone Output](https://github.com/vercel/next.js/tree/canary/examples/with-docker)** — Uses `output: "standalone"` to generate a minimal, production-ready Docker image with only the required runtime files and dependencies.
+- **[Docker Export Output](https://github.com/vercel/next.js/tree/canary/examples/with-docker-export-output)** — Uses `output: "export"` to generate optimized HTML files served from a lightweight container or static hosting environment.
+- **[Docker Multi-Environment](https://github.com/vercel/next.js/tree/canary/examples/with-docker-multi-env)** — Manages separate Docker configurations for development, staging, and production environments.
+
+Hosting providers with Next.js deployment guides:
+
+- [DigitalOcean](https://github.com/nextjs/deploy-digitalocean)
+- [Fly.io](https://github.com/nextjs/deploy-fly)
+- [Google Cloud Run](https://github.com/nextjs/deploy-google-cloud-run)
+- [Render](https://github.com/nextjs/deploy-render)
+- [SST](https://github.com/nextjs/deploy-sst)
+
+## Static export
+
+Next.js can be used as a static site or Single-Page Application (SPA), then optionally upgraded later to use server features.
+
+A static export can be deployed to any web server that serves HTML/CSS/JS static assets, including AWS S3, Nginx, and Apache.
+
+<Warning>
+  Running as a static export does not support Next.js features that require a server, such as dynamic routes with `getServerSideProps`, API routes, Image Optimization (default loader), and middleware. See [static exports](/app/guides/static-exports#unsupported-features) for the full list of unsupported features.
+</Warning>
+
+To enable static export, update `next.config.js`:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',
+}
+
+module.exports = nextConfig
+```
+
+After running `next build`, Next.js generates an `out` folder with HTML/CSS/JS assets.
+
+### Deployment templates
+
+- [GitHub Pages](https://github.com/nextjs/deploy-github-pages)
+
+## Adapters
+
+Next.js can be adapted to run on platforms with their own infrastructure capabilities.
+
+Refer to each provider's documentation for supported Next.js features:
+
+| Platform | Documentation |
+| -------- | ------------- |
+| Appwrite Sites | [docs](https://appwrite.io/docs/products/sites/quick-start/nextjs) |
+| AWS Amplify Hosting | [docs](https://docs.amplify.aws/nextjs/start/quickstart/nextjs-app-router-client-components) |
+| Cloudflare | [docs](https://developers.cloudflare.com/workers/frameworks/framework-guides/nextjs) |
+| Deno Deploy | [docs](https://docs.deno.com/examples/next_tutorial) |
+| Firebase App Hosting | [docs](https://firebase.google.com/docs/app-hosting/get-started) |
+| Netlify | [docs](https://docs.netlify.com/frameworks/next-js/overview/#next-js-support-on-netlify) |
+| Vercel | [docs](https://vercel.com/docs/frameworks/nextjs) |
+
+<Note>
+  A [Deployment Adapters API](https://github.com/vercel/next.js/discussions/77740) is in development to standardize how all platforms adopt Next.js. Documentation on writing custom adapters will be added after completion.
+</Note>

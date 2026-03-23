@@ -1,0 +1,116 @@
+---
+title: Installation
+description: Create a new Next.js Pages Router project with create-next-app, or add Pages Router to an existing project.
+---
+
+This guide shows you how to create a new Next.js project that uses the Pages Router, or how to set up the Pages Router in an existing project.
+
+## Create a new project
+
+Run the following command to scaffold a new Next.js application:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npx create-next-app@latest
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn create next-app
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```bash
+    pnpm create next-app
+    ```
+  </Tab>
+</Tabs>
+
+During setup, you will see the following prompts:
+
+```txt
+What is your project named? my-app
+Would you like to use TypeScript? No / Yes
+Would you like to use ESLint? No / Yes
+Would you like to use Tailwind CSS? No / Yes
+Would you like your code inside a `src/` directory? No / Yes
+Would you like to use App Router? (recommended) No / Yes
+Would you like to use Turbopack for `next dev`? No / Yes
+Would you like to customize the import alias? No / Yes
+```
+
+To use the Pages Router, answer **No** to "Would you like to use App Router?". `create-next-app` will generate a `pages/` directory instead of `app/`.
+
+## Start the development server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to see your application. Edit `pages/index.tsx` (or `pages/index.js`) to start building.
+
+## Manual setup
+
+If you prefer to set up Next.js manually:
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install next react react-dom
+    ```
+
+    For TypeScript, also install:
+
+    ```bash
+    npm install --save-dev typescript @types/react @types/node
+    ```
+  </Step>
+  <Step title="Add scripts to package.json">
+    ```json package.json
+    {
+      "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start"
+      }
+    }
+    ```
+  </Step>
+  <Step title="Create the pages directory">
+    Create a `pages/` directory at the root of your project. Add an `index.tsx` file:
+
+    ```tsx pages/index.tsx
+    export default function Home() {
+      return <h1>Hello, Pages Router</h1>
+    }
+    ```
+  </Step>
+  <Step title="Create a next.config.js (optional)">
+    ```js next.config.js
+    /** @type {import('next').NextConfig} */
+    const nextConfig = {}
+
+    module.exports = nextConfig
+    ```
+  </Step>
+</Steps>
+
+## TypeScript
+
+Next.js has built-in TypeScript support. Create a `tsconfig.json` at the root of your project and run `next dev`—Next.js will automatically configure it for you.
+
+```json tsconfig.json
+{}
+```
+
+Next.js creates a `next-env.d.ts` file that ensures the Next.js types are picked up by the TypeScript compiler. Do not delete or edit this file.
+
+<Note>
+For the App Router equivalent, see [App Router installation](/app/getting-started/installation).
+</Note>
+
+## System requirements
+
+- [Node.js 18.18](https://nodejs.org/) or later.
+- macOS, Windows (including WSL), or Linux.

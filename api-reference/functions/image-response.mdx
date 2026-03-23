@@ -1,0 +1,183 @@
+---
+title: ImageResponse
+description: API reference for the ImageResponse class, used to generate dynamic images (e.g. Open Graph images) using JSX and CSS.
+---
+
+`ImageResponse` lets you generate dynamic images using JSX and CSS. This is useful for social media images such as Open Graph images and Twitter cards.
+
+```typescript
+import { ImageResponse } from 'next/og'
+
+new ImageResponse(
+  element: ReactElement,
+  options?: ImageResponseOptions
+)
+```
+
+## Parameters
+
+<ParamField body="element" type="ReactElement" required>
+  A React element (JSX) describing the image layout. Only a [subset of CSS and HTML](#supported-css) is supported.
+</ParamField>
+
+<ParamField body="options" type="ImageResponseOptions">
+  Optional configuration:
+
+  <Expandable title="options">
+    <ResponseField name="width" type="number" default="1200">
+      Image width in pixels.
+    </ResponseField>
+    <ResponseField name="height" type="number" default="630">
+      Image height in pixels.
+    </ResponseField>
+    <ResponseField name="emoji" type="'twemoji' | 'blobmoji' | 'noto' | 'openmoji'" default="'twemoji'">
+      Emoji style to use.
+    </ResponseField>
+    <ResponseField name="fonts" type="FontConfig[]">
+      Custom fonts. Each entry: `{ name: string, data: ArrayBuffer, weight: number, style: 'normal' | 'italic' }`.
+    </ResponseField>
+    <ResponseField name="debug" type="boolean" default="false">
+      Show a debug bounding box overlay.
+    </ResponseField>
+    <ResponseField name="status" type="number" default="200">
+      HTTP response status.
+    </ResponseField>
+    <ResponseField name="statusText" type="string">
+      HTTP response status text.
+    </ResponseField>
+    <ResponseField name="headers" type="Record<string, string>">
+      HTTP response headers.
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Supported CSS
+
+`ImageResponse` supports common CSS including:
+
+- Flexbox layout (`display: flex`)
+- Absolute positioning
+- Custom fonts
+- Text wrapping and centering
+- Nested images
+
+<Warning>
+  Advanced layouts like CSS Grid (`display: grid`) are **not** supported. For a full list of supported properties, see [Satori's documentation](https://github.com/vercel/satori#css).
+</Warning>
+
+## Behavior
+
+- Uses [@vercel/og](https://vercel.com/docs/concepts/functions/edge-functions/og-image-generation), [Satori](https://github.com/vercel/satori), and Resvg to convert JSX/CSS into PNG.
+- Maximum bundle size is **500KB** (includes JSX, CSS, fonts, images, and other assets).
+- Supported font formats: `ttf`, `otf`, `woff`. Prefer `ttf` or `otf` for faster parsing.
+
+## Examples
+
+### In a Route Handler
+
+```typescript app/api/og/route.tsx
+import { ImageResponse } from 'next/og'
+
+export async function GET() {
+  try {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'white',
+            padding: '40px',
+          }}
+        >
+          <div style={{ fontSize: 60, fontWeight: 'bold' }}>
+            Welcome to My Site
+          </div>
+        </div>
+      ),
+      { width: 1200, height: 630 }
+    )
+  } catch (e: unknown) {
+    return new Response('Failed to generate image', { status: 500 })
+  }
+}
+```
+
+### With `opengraph-image.tsx`
+
+```typescript app/opengraph-image.tsx
+import { ImageResponse } from 'next/og'
+
+export const alt = 'My site'
+export const size = { width: 1200, height: 630 }
+export const contentType = 'image/png'
+
+export default async function Image() {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        My site
+      </div>
+    ),
+    { ...size }
+  )
+}
+```
+
+### With custom fonts
+
+```typescript app/opengraph-image.tsx
+import { ImageResponse } from 'next/og'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+export const size = { width: 1200, height: 630 }
+export const contentType = 'image/png'
+
+export default async function Image() {
+  const interSemiBold = await readFile(
+    join(process.cwd(), 'assets/Inter-SemiBold.ttf')
+  )
+
+  return new ImageResponse(
+    (
+      <div style={{ fontFamily: 'Inter', fontSize: 64, display: 'flex' }}>
+        My site
+      </div>
+    ),
+    {
+      ...size,
+      fonts: [
+        {
+          name: 'Inter',
+          data: interSemiBold,
+          style: 'normal',
+          weight: 600,
+        },
+      ],
+    }
+  )
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v14.0.0` | `ImageResponse` moved from `next/server` to `next/og`. |
+| `v13.3.0` | `ImageResponse` importable from `next/server`. |
+| `v13.0.0` | `ImageResponse` introduced via `@vercel/og`. |

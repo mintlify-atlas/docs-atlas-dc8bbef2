@@ -1,0 +1,226 @@
+---
+title: Streaming
+description: Learn how to use React Suspense and the loading.js convention to progressively stream UI from the server to the client in Next.js.
+---
+
+Streaming allows the server to send parts of a page to the client as soon as they're ready, rather than waiting for the entire page to render. Users see content sooner, even if parts of the page are still loading.
+
+## How streaming works
+
+Without streaming, the browser must wait for the server to render the full page before showing anything. With streaming, Next.js sends a static shell immediately and streams in dynamic content as it resolves:
+
+```
+Without streaming:
+  request → [wait for all data] → full HTML → display
+
+With streaming:
+  request → static shell → display
+             ↓
+             dynamic chunk 1 → streamed in
+             dynamic chunk 2 → streamed in
+```
+
+Streaming is built on HTTP chunked transfer encoding. Each `<Suspense>` boundary in your component tree becomes a streaming chunk.
+
+## Two ways to stream
+
+<CardGroup cols={2}>
+  <Card title="loading.js" icon="file">
+    Streams an entire route segment. Wraps `page.tsx` in a `<Suspense>` boundary automatically.
+  </Card>
+  <Card title="React Suspense" icon="clock">
+    Streams specific parts of a page. Gives you granular control over which components stream.
+  </Card>
+</CardGroup>
+
+## With `loading.js`
+
+Create a `loading.js` file in the same folder as your page to show a loading state while the page renders:
+
+```tsx filename="app/blog/loading.tsx"
+export default function Loading() {
+  return <div>Loading...</div>
+}
+```
+
+On navigation, the user immediately sees the layout and loading state. The new content swaps in once rendering is complete.
+
+**How it works internally:** `loading.js` is nested inside `layout.js` and automatically wraps `page.js` and its children in a `<Suspense>` boundary.
+
+```
+app/blog/
+├── layout.tsx    ← wraps everything
+├── loading.tsx   ← becomes <Suspense fallback={<Loading />}>
+└── page.tsx      ← streamed inside the Suspense boundary
+```
+
+<Warning>
+  A layout that accesses uncached or runtime data (such as `cookies()`, `headers()`, or uncached fetches) does not fall back to the same route segment's `loading.js`. It blocks navigation until the layout finishes rendering. Move data fetching into `page.js` where `loading.js` can cover it, or wrap the uncached access in its own `<Suspense>` boundary.
+</Warning>
+
+## With `<Suspense>`
+
+For more granular control, wrap specific components in `<Suspense>` boundaries:
+
+```tsx filename="app/blog/page.tsx"
+import { Suspense } from 'react'
+import BlogList from '@/components/BlogList'
+import BlogListSkeleton from '@/components/BlogListSkeleton'
+
+export default function BlogPage() {
+  return (
+    <div>
+      {/* Sent to the client immediately */}
+      <header>
+        <h1>Welcome to the Blog</h1>
+        <p>Read the latest posts below.</p>
+      </header>
+      <main>
+        {/* Streams in when BlogList resolves */}
+        <Suspense fallback={<BlogListSkeleton />}>
+          <BlogList />
+        </Suspense>
+      </main>
+    </div>
+  )
+}
+```
+
+Content outside the `<Suspense>` boundary (`<header>`) is sent immediately. Content inside streams in when the async work completes.
+
+## Creating meaningful loading states
+
+Design loading states that help users understand the app is responding. Good fallback UI examples:
+
+- **Skeletons**: placeholder shapes that match the layout of the final content
+- **Spinners**: for simple, short-duration loads
+- **Partial content**: a cover photo or title before body content loads
+
+```tsx filename="app/components/PostSkeleton.tsx"
+export default function PostSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-6 bg-gray-200 rounded w-3/4 mb-4" />
+      <div className="h-4 bg-gray-200 rounded w-full mb-2" />
+      <div className="h-4 bg-gray-200 rounded w-5/6" />
+    </div>
+  )
+}
+```
+
+## Streaming with Server Components
+
+Server Components and `<Suspense>` work together. An async Server Component inside a `<Suspense>` boundary streams its content when it resolves:
+
+```tsx filename="app/page.tsx"
+import { Suspense } from 'react'
+
+async function SlowComponent() {
+  // Simulates a slow data fetch
+  const data = await fetch('https://api.example.com/slow-data')
+  const json = await data.json()
+  return <p>{json.message}</p>
+}
+
+export default function Page() {
+  return (
+    <>
+      <h1>Page Title</h1>
+      {/* Shown immediately */}
+      <p>Static content that renders right away.</p>
+      {/* Streams in when SlowComponent resolves */}
+      <Suspense fallback={<p>Loading slow content...</p>}>
+        <SlowComponent />
+      </Suspense>
+    </>
+  )
+}
+```
+
+## Streaming data from Server to Client
+
+Pass an unawaited promise from a Server Component to a Client Component, then resolve it with the `use` API:
+
+```tsx filename="app/page.tsx"
+import Posts from '@/app/ui/posts'
+import { Suspense } from 'react'
+
+async function getPosts() {
+  const res = await fetch('https://api.example.com/posts')
+  return res.json()
+}
+
+export default function Page() {
+  const posts = getPosts() // Don't await
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Posts posts={posts} />
+    </Suspense>
+  )
+}
+```
+
+```tsx filename="app/ui/posts.tsx"
+'use client'
+import { use } from 'react'
+
+export default function Posts({
+  posts,
+}: {
+  posts: Promise<{ id: string; title: string }[]>
+}) {
+  const allPosts = use(posts) // Suspends until the promise resolves
+
+  return (
+    <ul>
+      {allPosts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## Streaming with Partial Prerendering
+
+When Cache Components is enabled, Next.js uses Partial Prerendering (PPR) by default. The static shell (including `<Suspense>` fallbacks) is prerendered at build time. Dynamic content streams in at request time:
+
+```tsx filename="app/blog/page.tsx"
+import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { cacheLife } from 'next/cache'
+
+export default function Page() {
+  return (
+    <>
+      {/* Prerendered at build time */}
+      <h1>My Blog</h1>
+
+      {/* Cached — included in static shell */}
+      <BlogPosts />
+
+      {/* Fallback prerendered; content streams at request time */}
+      <Suspense fallback={<p>Loading preferences...</p>}>
+        <UserPreferences />
+      </Suspense>
+    </>
+  )
+}
+
+async function BlogPosts() {
+  'use cache'
+  cacheLife('hours')
+  const res = await fetch('https://api.vercel.app/blog')
+  const posts = await res.json()
+  return <ul>{posts.map((p: any) => <li key={p.id}>{p.title}</li>)}</ul>
+}
+
+async function UserPreferences() {
+  // Reads cookies — dynamic, streams at request time
+  const theme = (await cookies()).get('theme')?.value || 'light'
+  return <p>Theme: {theme}</p>
+}
+```
+
+The `<Suspense>` fallback (`<p>Loading preferences...</p>`) is included in the static HTML shell sent on the first request. The `UserPreferences` content streams in once it resolves.

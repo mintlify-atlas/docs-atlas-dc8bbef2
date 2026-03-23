@@ -1,0 +1,260 @@
+---
+title: Rendering
+description: Understand how Next.js renders your application — Server Components, Client Components, and the rendering strategies available in the App Router.
+---
+
+Next.js uses React Server Components by default. Understanding how and where your components render is fundamental to building performant applications.
+
+## Server Components vs Client Components
+
+The App Router gives you two types of React components, each optimized for different environments.
+
+### When to use each
+
+<Tabs>
+  <Tab title="Server Components">
+    Use Server Components when you need to:
+
+    - Fetch data from databases or APIs close to the source
+    - Use API keys, tokens, and secrets without exposing them to the client
+    - Reduce the amount of JavaScript sent to the browser
+    - Improve First Contentful Paint (FCP) and stream content progressively
+
+    Server Components are the **default** in the App Router. All layouts and pages are Server Components unless you opt out.
+  </Tab>
+  <Tab title="Client Components">
+    Use Client Components when you need:
+
+    - State and event handlers (`onClick`, `onChange`)
+    - Lifecycle logic (`useEffect`)
+    - Browser-only APIs (`localStorage`, `window`, `Navigator.geolocation`)
+    - Custom hooks
+
+    Add the `"use client"` directive at the top of a file to make it a Client Component.
+  </Tab>
+</Tabs>
+
+### Creating a Client Component
+
+```tsx filename="app/ui/counter.tsx"
+'use client'
+
+import { useState } from 'react'
+
+export default function Counter() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div>
+      <p>{count} likes</p>
+      <button onClick={() => setCount(count + 1)}>Click me</button>
+    </div>
+  )
+}
+```
+
+`"use client"` declares a boundary between the Server and Client module graphs. Once a file is marked with `"use client"`, all its imports and child components are considered part of the client bundle.
+
+### Composing Server and Client Components
+
+A common pattern is to fetch data in a Server Component and pass it as props to an interactive Client Component:
+
+```tsx filename="app/[id]/page.tsx"
+import LikeButton from '@/app/ui/like-button'
+import { getPost } from '@/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const post = await getPost(id)
+
+  return (
+    <div>
+      <main>
+        <h1>{post.title}</h1>
+        <LikeButton likes={post.likes} />
+      </main>
+    </div>
+  )
+}
+```
+
+```tsx filename="app/ui/like-button.tsx"
+'use client'
+
+import { useState } from 'react'
+
+export default function LikeButton({ likes }: { likes: number }) {
+  // interactive state management here
+}
+```
+
+### Passing Server Components as props
+
+You can pass Server Components as children or props to Client Components. This allows you to nest server-rendered UI inside client-side state:
+
+```tsx filename="app/ui/modal.tsx"
+'use client'
+
+export default function Modal({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>
+}
+```
+
+```tsx filename="app/page.tsx"
+import Modal from './ui/modal'
+import Cart from './ui/cart'
+
+export default function Page() {
+  return (
+    <Modal>
+      <Cart />
+    </Modal>
+  )
+}
+```
+
+All Server Components (including `<Cart />`) are rendered on the server ahead of time. The RSC Payload contains references to where Client Components should render in the tree.
+
+## How rendering works
+
+### On the server
+
+Next.js uses React's APIs to orchestrate rendering, split by individual route segments (layouts and pages):
+
+1. **Server Components** are rendered into a special data format called the React Server Component Payload (RSC Payload)
+2. **Client Components** and the RSC Payload are used to prerender HTML
+
+<Note>
+  The RSC Payload is a compact binary representation of the rendered React Server Components tree. It contains the rendered result of Server Components, placeholders for Client Components with references to their JavaScript files, and any props passed from Server to Client Components.
+</Note>
+
+### On the client
+
+On the client:
+
+1. **HTML** is used to immediately show a fast non-interactive preview of the route
+2. **RSC Payload** is used to reconcile the Client and Server Component trees
+3. **JavaScript** hydrates Client Components and makes the application interactive
+
+### Subsequent navigations
+
+On subsequent navigations, the RSC Payload is prefetched and cached for instant navigation. Client Components are rendered entirely on the client, without the server-rendered HTML.
+
+## Rendering strategies
+
+### Prerendering (static)
+
+Prerendering happens at build time or during revalidation. The result is cached and served to all users. This is the default behavior for routes that don't use runtime data.
+
+```tsx filename="app/blog/page.tsx"
+export default async function Page() {
+  // This fetch result can be cached and prerendered
+  const data = await fetch('https://api.example.com/posts')
+  const posts = await data.json()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### Dynamic rendering
+
+Dynamic rendering happens at request time when a route accesses runtime APIs like `cookies()`, `headers()`, or `searchParams`.
+
+```tsx filename="app/page.tsx"
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  const cookieStore = await cookies()
+  const theme = cookieStore.get('theme')?.value || 'light'
+  return <p>Your theme: {theme}</p>
+}
+```
+
+### Partial Prerendering (PPR)
+
+With Cache Components enabled, Next.js uses **Partial Prerendering** by default. This generates a static shell at build time while allowing specific parts of the page to stream in at request time.
+
+```
+Static shell (prerendered)
+├── <header> (static)
+├── <BlogPosts /> (cached with `use cache`)
+└── <Suspense fallback={<Skeleton />}>
+    └── <UserPreferences /> (streams at request time)
+```
+
+<Tip>
+  You can verify that a route was fully prerendered by checking the build output summary, or by viewing the page source in your browser to see what was included in the static shell.
+</Tip>
+
+## Preventing environment poisoning
+
+JavaScript modules can be shared between Server and Client Components. Use the `server-only` package to prevent accidental usage of server-side code on the client:
+
+```bash
+npm install server-only
+```
+
+```typescript filename="lib/data.ts"
+import 'server-only'
+
+export async function getData() {
+  const res = await fetch('https://external-service.com/data', {
+    headers: {
+      authorization: process.env.API_KEY,
+    },
+  })
+  return res.json()
+}
+```
+
+If this module is imported in a Client Component, you'll get a build-time error. The corresponding `client-only` package works the same way for client-only code.
+
+## Context providers
+
+React context is not supported in Server Components. Create a Client Component that accepts children:
+
+```tsx filename="app/theme-provider.tsx"
+'use client'
+
+import { createContext } from 'react'
+
+export const ThemeContext = createContext({})
+
+export default function ThemeProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <ThemeContext.Provider value="dark">{children}</ThemeContext.Provider>
+}
+```
+
+Then import it into a Server Component layout:
+
+```tsx filename="app/layout.tsx"
+import ThemeProvider from './theme-provider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```

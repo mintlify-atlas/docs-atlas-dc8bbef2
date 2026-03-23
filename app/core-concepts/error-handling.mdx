@@ -1,0 +1,283 @@
+---
+title: Error Handling
+description: Learn how to handle expected errors with return values and unexpected exceptions with error boundaries in Next.js App Router.
+---
+
+Errors fall into two categories: **expected errors** that can occur during normal operation (like form validation failures), and **unexpected exceptions** that indicate bugs. This page covers how to handle both.
+
+## Handling expected errors
+
+Expected errors should be modeled as return values, not thrown exceptions.
+
+### Server Functions
+
+Use the `useActionState` hook to handle expected errors from Server Functions. Instead of throwing, return the error as a value:
+
+```typescript filename="app/actions.ts"
+'use server'
+
+export async function createPost(prevState: any, formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  const res = await fetch('https://api.vercel.app/posts', {
+    method: 'POST',
+    body: { title, content },
+  })
+
+  if (!res.ok) {
+    return { message: 'Failed to create post' }
+  }
+}
+```
+
+In your Client Component, use `useActionState` to read the returned state and display the error:
+
+```tsx filename="app/ui/form.tsx"
+'use client'
+
+import { useActionState } from 'react'
+import { createPost } from '@/app/actions'
+
+const initialState = { message: '' }
+
+export function Form() {
+  const [state, formAction, pending] = useActionState(createPost, initialState)
+
+  return (
+    <form action={formAction}>
+      <label htmlFor="title">Title</label>
+      <input type="text" id="title" name="title" required />
+      <label htmlFor="content">Content</label>
+      <textarea id="content" name="content" required />
+      {state?.message && <p aria-live="polite">{state.message}</p>}
+      <button disabled={pending}>Create Post</button>
+    </form>
+  )
+}
+```
+
+### Server Components
+
+In a Server Component, use the fetch response to conditionally render an error message:
+
+```tsx filename="app/page.tsx"
+export default async function Page() {
+  const res = await fetch('https://...')
+  const data = await res.json()
+
+  if (!res.ok) {
+    return 'There was an error.'
+  }
+
+  return '...'
+}
+```
+
+### Not found
+
+Call `notFound()` to render a 404 UI. Create a `not-found.tsx` file in the route segment to customize the UI:
+
+```tsx filename="app/blog/[slug]/page.tsx"
+import { notFound } from 'next/navigation'
+import { getPostBySlug } from '@/lib/posts'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const post = getPostBySlug(slug)
+
+  if (!post) {
+    notFound()
+  }
+
+  return <div>{post.title}</div>
+}
+```
+
+```tsx filename="app/blog/[slug]/not-found.tsx"
+export default function NotFound() {
+  return <div>404 - Page Not Found</div>
+}
+```
+
+## Handling uncaught exceptions
+
+Unexpected errors should be thrown. Next.js catches them with error boundaries and displays fallback UI.
+
+### The `error.js` convention
+
+Create an `error.tsx` file inside a route segment to define an error boundary for that segment:
+
+```tsx filename="app/dashboard/error.tsx"
+'use client' // Error boundaries must be Client Components
+
+import { useEffect } from 'react'
+
+export default function ErrorPage({
+  error,
+  unstable_retry,
+}: {
+  error: Error & { digest?: string }
+  unstable_retry: () => void
+}) {
+  useEffect(() => {
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button onClick={() => unstable_retry()}>
+        Try again
+      </button>
+    </div>
+  )
+}
+```
+
+Errors bubble up to the nearest parent error boundary. Place `error.tsx` files at different levels in the route hierarchy to control the scope of error recovery.
+
+**Component hierarchy with error boundary:**
+
+```
+app/dashboard/
+├── layout.tsx
+├── error.tsx    ← catches errors from page.tsx
+└── page.tsx
+```
+
+<Note>
+  The `error.tsx` component must be a Client Component because it uses React lifecycle methods to catch and display errors during rendering.
+</Note>
+
+### Custom error boundaries with `unstable_catchError`
+
+For component-level error recovery, use `unstable_catchError` to create error boundaries that wrap any part of your component tree:
+
+```tsx filename="app/custom-error-boundary.tsx"
+'use client'
+
+import { unstable_catchError as catchError, type ErrorInfo } from 'next/error'
+
+function ErrorFallback(
+  props: { title: string },
+  { error, unstable_retry }: ErrorInfo
+) {
+  return (
+    <div>
+      <h2>{props.title}</h2>
+      <p>{error.message}</p>
+      <button onClick={() => unstable_retry()}>Try again</button>
+    </div>
+  )
+}
+
+export default catchError(ErrorFallback)
+```
+
+Use the returned component as a wrapper:
+
+```tsx filename="app/some-component.tsx"
+import ErrorBoundary from './custom-error-boundary'
+
+export default function Component({ children }: { children: React.ReactNode }) {
+  return <ErrorBoundary title="Dashboard Error">{children}</ErrorBoundary>
+}
+```
+
+### Global errors
+
+Handle errors in the root layout using `global-error.tsx`. This replaces the root layout when active, so it must include `<html>` and `<body>` tags:
+
+```tsx filename="app/global-error.tsx"
+'use client'
+
+export default function GlobalError({
+  error,
+  unstable_retry,
+}: {
+  error: Error & { digest?: string }
+  unstable_retry: () => void
+}) {
+  return (
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => unstable_retry()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+```
+
+## Errors in event handlers
+
+Error boundaries don't catch errors inside event handlers — they only catch errors during rendering. For event handler errors, use `try/catch` with `useState`:
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+
+export function Button() {
+  const [error, setError] = useState<Error | null>(null)
+
+  const handleClick = () => {
+    try {
+      throw new Error('Exception')
+    } catch (reason) {
+      setError(reason as Error)
+    }
+  }
+
+  if (error) {
+    return <p>Error: {error.message}</p>
+  }
+
+  return (
+    <button type="button" onClick={handleClick}>
+      Click me
+    </button>
+  )
+}
+```
+
+### Errors in transitions
+
+Unhandled errors inside `startTransition` from `useTransition` bubble up to the nearest error boundary:
+
+```tsx
+'use client'
+
+import { useTransition } from 'react'
+
+export function Button() {
+  const [pending, startTransition] = useTransition()
+
+  const handleClick = () =>
+    startTransition(() => {
+      throw new Error('Exception')
+    })
+
+  return (
+    <button type="button" onClick={handleClick}>
+      Click me
+    </button>
+  )
+}
+```
+
+## Summary
+
+<CardGroup cols={2}>
+  <Card title="Expected errors" icon="check-circle">
+    Return errors as values from Server Functions. Use `useActionState` in Client Components to display them. Use `notFound()` for 404s.
+  </Card>
+  <Card title="Unexpected errors" icon="alert-circle">
+    Throw errors and let error boundaries catch them. Use `error.tsx` for route-level boundaries, `global-error.tsx` for the root layout.
+  </Card>
+</CardGroup>

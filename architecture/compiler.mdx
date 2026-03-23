@@ -1,0 +1,234 @@
+---
+title: Next.js compiler
+description: The Next.js SWC compiler transforms and minifies your application. Learn what it compiles, how to configure it, and when Babel is used as a fallback.
+---
+
+The Next.js Compiler is written in Rust using [SWC](https://swc.rs/). It replaces Babel for transforming individual files and Terser for minifying output bundles. Compilation with the SWC compiler is 17x faster than Babel and has been enabled by default since Next.js 12.
+
+## Why SWC
+
+Next.js uses SWC for several reasons:
+
+- **Performance** — ~3x faster Fast Refresh and ~5x faster production builds compared to Babel.
+- **Extensibility** — SWC can be used as a crate inside Next.js without forking the library.
+- **WebAssembly support** — Rust's WASM target means Next.js can compile on any platform, including environments where native binaries are unavailable.
+- **Ecosystem** — SWC is maintained by the Vercel team and used across the JavaScript ecosystem.
+
+## What the compiler handles
+
+<AccordionGroup>
+  <Accordion title="TypeScript and JSX">
+    SWC strips TypeScript types and transforms JSX to `React.createElement` calls (or the automatic JSX runtime). This is the baseline transform applied to every file in your application.
+  </Accordion>
+  <Accordion title="Minification">
+    Since Next.js 13, the SWC compiler minifies production output by default. This is 7x faster than Terser.
+
+    <Note>
+      Starting with Next.js 15, minification cannot be customized via `next.config.js`. The `swcMinify` flag has been removed.
+    </Note>
+  </Accordion>
+  <Accordion title="Dead code elimination">
+    The compiler removes server-only code from client bundles and client-only code from server bundles using compile-time `if/else` branches that evaluate `process.env.NODE_ENV` and other build-time constants.
+  </Accordion>
+  <Accordion title="Source maps">
+    Source maps are generated for both client and server bundles, enabling accurate stack traces during development and in production error monitoring tools.
+  </Accordion>
+</AccordionGroup>
+
+## Supported transforms
+
+### Styled Components
+
+Port of `babel-plugin-styled-components`. Adds server-side rendering support and display names for styled components.
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    styledComponents: true,
+  },
+}
+```
+
+For advanced configuration:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    styledComponents: {
+      displayName: true,    // adds display names (default: dev only)
+      ssr: true,            // enables SSR support (default: true)
+      fileName: true,       // includes filename in class names (default: true)
+      minify: true,         // minifies template literals (default: true)
+      transpileTemplateLiterals: true,
+      pure: false,          // enables pure annotation for tree-shaking
+      cssProp: true,        // enables the css prop
+    },
+  },
+}
+```
+
+### Emotion
+
+Port of `@emotion/babel-plugin`. Adds source maps and auto-labeling to Emotion CSS-in-JS.
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    emotion: {
+      sourceMap: true,         // default: true in dev
+      autoLabel: 'dev-only',   // 'never' | 'dev-only' | 'always'
+      labelFormat: '[local]',  // '[local]' | '[filename]' | '[dirname]'
+    },
+  },
+}
+```
+
+### Relay
+
+Compiles Relay GraphQL queries at build time:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    relay: {
+      src: './',
+      artifactDirectory: './__generated__',
+      language: 'typescript',
+      eagerEsModules: false,
+    },
+  },
+}
+```
+
+<Warning>
+  Set `artifactDirectory` outside your `pages/` directory. The relay compiler generates files next to source files, and files inside `pages/` are treated as routes, which breaks production builds.
+</Warning>
+
+### Remove React properties
+
+Removes JSX properties matching a regex. Commonly used to strip `data-test*` attributes from production builds:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    // Remove properties matching the default regex: ^data-test
+    reactRemoveProperties: true,
+
+    // Or specify custom regexes (Rust regex syntax)
+    // reactRemoveProperties: { properties: ['^data-custom$'] },
+  },
+}
+```
+
+### Remove console calls
+
+Strips `console.*` calls from application code (not `node_modules`):
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    removeConsole: true,
+
+    // Keep console.error
+    // removeConsole: { exclude: ['error'] },
+  },
+}
+```
+
+### Module transpilation
+
+Transpiles and bundles dependencies from local packages (monorepos) or `node_modules`:
+
+```js filename="next.config.js"
+module.exports = {
+  transpilePackages: ['@acme/ui', 'lodash-es'],
+}
+```
+
+### Build-time variable replacement
+
+Statically replaces variables at build time using the `define` option:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    define: {
+      MY_VARIABLE: 'my-string',
+      'process.env.MY_ENV_VAR': 'my-env-var',
+    },
+    // Server and edge only:
+    defineServer: {
+      MY_SERVER_VARIABLE: 'my-server-var',
+    },
+  },
+}
+```
+
+### Build lifecycle hooks
+
+Run custom code after production compilation finishes, before type checking and static generation:
+
+```js filename="next.config.js"
+module.exports = {
+  compiler: {
+    runAfterProductionCompile: async ({ distDir, projectDir }) => {
+      // Collect sourcemaps, notify error monitoring tools, etc.
+      console.log('Build output at:', distDir)
+    },
+  },
+}
+```
+
+## Experimental features
+
+### SWC plugins
+
+SWC supports experimental plugins written in WebAssembly:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcPlugins: [
+      ['my-swc-plugin', { /* plugin options */ }],
+    ],
+  },
+}
+```
+
+Each entry in `swcPlugins` is a tuple of the npm package name (or path to a `.wasm` binary) and a configuration object.
+
+### SWC trace profiling
+
+Generate Chromium trace events to profile the compiler's internal transforms:
+
+```js filename="next.config.js"
+module.exports = {
+  experimental: {
+    swcTraceProfiling: true,
+  },
+}
+```
+
+Trace files are written to `.next/swc-trace-profile-{timestamp}.json`. Open them in [Perfetto](https://ui.perfetto.dev/) or `chrome://tracing`.
+
+## Babel fallback
+
+If your project has a `.babelrc` file, Next.js automatically falls back to Babel for transforming individual files. This ensures compatibility with existing applications that use custom Babel plugins.
+
+If you are using a custom Babel setup and want to migrate to the SWC compiler, remove `.babelrc` and replace any custom transforms with the [SWC plugin API](#swc-plugins) or one of the built-in transforms above.
+
+<Note>
+  Compilation with Babel active is ~17x slower than with SWC. Migrating to SWC is recommended for most applications.
+</Note>
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v15.0.0` | `swcMinify` flag removed; minification always uses SWC |
+| `v13.1.0` | Module transpilation and modularize imports stable |
+| `v13.0.0` | SWC minifier enabled by default |
+| `v12.3.0` | SWC minifier stable |
+| `v12.2.0` | SWC plugins experimental support added |
+| `v12.1.0` | Styled Components, Jest, Relay, and other transforms added |
+| `v12.0.0` | Next.js Compiler introduced |

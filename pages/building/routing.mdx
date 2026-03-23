@@ -1,0 +1,323 @@
+---
+title: Routing
+description: File-based routing in the Pages Router, including dynamic routes, catch-all routes, nested routes, the Link component, and API routes.
+---
+
+The Pages Router uses a file-system based router. Every file you add to the `pages/` directory becomes a route.
+
+## Defining routes
+
+A page is a React component exported from a `.js`, `.jsx`, `.ts`, or `.tsx` file in the `pages/` directory. The file path determines the URL.
+
+```tsx pages/about.tsx
+export default function About() {
+  return <div>About</div>
+}
+```
+
+This page is accessible at `/about`.
+
+### Index routes
+
+Files named `index` map to the root of their directory:
+
+- `pages/index.js` → `/`
+- `pages/blog/index.js` → `/blog`
+
+### Nested routes
+
+Nested folders create nested routes:
+
+- `pages/blog/first-post.js` → `/blog/first-post`
+- `pages/dashboard/settings/username.js` → `/dashboard/settings/username`
+
+## Dynamic routes
+
+Wrap a filename in square brackets to create a dynamic segment.
+
+```tsx pages/blog/[slug].tsx
+import { useRouter } from 'next/router'
+
+export default function Post() {
+  const router = useRouter()
+  return <p>Post: {router.query.slug}</p>
+}
+```
+
+| File | URL | `router.query` |
+| --- | --- | --- |
+| `pages/blog/[slug].js` | `/blog/hello` | `{ slug: 'hello' }` |
+| `pages/blog/[slug].js` | `/blog/world` | `{ slug: 'world' }` |
+
+### Catch-all routes
+
+Add `...` inside brackets to match multiple path segments:
+
+```txt
+pages/shop/[...slug].js
+```
+
+| URL | `router.query` |
+| --- | --- |
+| `/shop/a` | `{ slug: ['a'] }` |
+| `/shop/a/b` | `{ slug: ['a', 'b'] }` |
+| `/shop/a/b/c` | `{ slug: ['a', 'b', 'c'] }` |
+
+### Optional catch-all routes
+
+Double brackets make the parameter optional. The route also matches when the segment is absent:
+
+```txt
+pages/shop/[[...slug]].js
+```
+
+| URL | `router.query` |
+| --- | --- |
+| `/shop` | `{ slug: undefined }` |
+| `/shop/a` | `{ slug: ['a'] }` |
+| `/shop/a/b` | `{ slug: ['a', 'b'] }` |
+
+### Route precedence
+
+When multiple route patterns match a URL, Next.js uses this order of precedence:
+
+1. Predefined routes (`pages/blog/first-post.js`)
+2. Dynamic routes (`pages/blog/[slug].js`)
+3. Catch-all routes (`pages/blog/[...slug].js`)
+
+## Linking between pages
+
+Use the `Link` component from `next/link` to navigate between pages without a full page reload.
+
+```tsx
+import Link from 'next/link'
+
+export default function Nav() {
+  return (
+    <nav>
+      <Link href="/">Home</Link>
+      <Link href="/about">About</Link>
+      <Link href="/blog/hello-world">Blog post</Link>
+    </nav>
+  )
+}
+```
+
+Links in the viewport are prefetched automatically for pages using Static Generation.
+
+### Linking to dynamic routes
+
+Use string interpolation or a URL object for dynamic paths:
+
+<CodeGroup>
+
+```tsx String interpolation
+import Link from 'next/link'
+
+export default function Posts({ posts }: { posts: { id: string; slug: string; title: string }[] }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link href={`/blog/${encodeURIComponent(post.slug)}`}>
+            {post.title}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```tsx URL object
+import Link from 'next/link'
+
+export default function Posts({ posts }: { posts: { id: string; slug: string; title: string }[] }) {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link href={{ pathname: '/blog/[slug]', query: { slug: post.slug } }}>
+            {post.title}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+</CodeGroup>
+
+## Programmatic navigation
+
+Use `useRouter` for imperative navigation:
+
+```tsx
+import { useRouter } from 'next/router'
+
+export default function Page() {
+  const router = useRouter()
+
+  return (
+    <button onClick={() => router.push('/about')}>
+      Go to About
+    </button>
+  )
+}
+```
+
+### Shallow routing
+
+Shallow routing updates the URL without re-running data fetching methods:
+
+```tsx
+router.push('/?step=2', undefined, { shallow: true })
+```
+
+This is useful for updating query parameters without triggering `getStaticProps` or `getServerSideProps`.
+
+<Warning>
+Shallow routing only works for URL changes within the current page. If you shallow-route to a different page, the new page loads normally.
+</Warning>
+
+## Layouts
+
+### Single shared layout
+
+Wrap your entire application in a layout using `_app.js`:
+
+```tsx pages/_app.tsx
+import type { AppProps } from 'next/app'
+import Layout from '../components/Layout'
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <Layout>
+      <Component {...pageProps} />
+    </Layout>
+  )
+}
+```
+
+### Per-page layouts
+
+For pages that need different layouts, add a `getLayout` property to the page component:
+
+```tsx pages/dashboard.tsx
+import type { ReactElement } from 'react'
+import DashboardLayout from '../components/DashboardLayout'
+import type { NextPageWithLayout } from './_app'
+
+const Dashboard: NextPageWithLayout = () => {
+  return <p>Dashboard content</p>
+}
+
+Dashboard.getLayout = function getLayout(page: ReactElement) {
+  return <DashboardLayout>{page}</DashboardLayout>
+}
+
+export default Dashboard
+```
+
+```tsx pages/_app.tsx
+import type { ReactElement, ReactNode } from 'react'
+import type { NextPage } from 'next'
+import type { AppProps } from 'next/app'
+
+export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
+  getLayout?: (page: ReactElement) => ReactNode
+}
+
+type AppPropsWithLayout = AppProps & {
+  Component: NextPageWithLayout
+}
+
+export default function MyApp({ Component, pageProps }: AppPropsWithLayout) {
+  const getLayout = Component.getLayout ?? ((page) => page)
+  return getLayout(<Component {...pageProps} />)
+}
+```
+
+## API routes
+
+Files inside `pages/api/` become API endpoints. They run on the server and are never sent to the browser.
+
+```ts pages/api/hello.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+type ResponseData = {
+  message: string
+}
+
+export default function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  res.status(200).json({ message: 'Hello from Next.js!' })
+}
+```
+
+This handler is accessible at `/api/hello`.
+
+### Handling HTTP methods
+
+```ts pages/api/posts.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'POST') {
+    // handle POST
+  } else {
+    res.setHeader('Allow', ['POST'])
+    res.status(405).end(`Method ${req.method} Not Allowed`)
+  }
+}
+```
+
+### Built-in request helpers
+
+API routes expose parsed request data on `req`:
+
+- `req.cookies` — cookies sent with the request
+- `req.query` — parsed query string
+- `req.body` — parsed request body
+
+### Dynamic API routes
+
+API routes support the same dynamic segment syntax as page routes:
+
+```ts pages/api/post/[pid].ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { pid } = req.query
+  res.end(`Post: ${pid}`)
+}
+```
+
+<Note>
+In the App Router, [Route Handlers](https://nextjs.org/api-reference/file-conventions/route) replace API routes and support streaming, Web API request/response objects, and more.
+</Note>
+
+## Custom error pages
+
+### 404 page
+
+Create `pages/404.tsx` for a custom 404 page. It is statically generated at build time.
+
+```tsx pages/404.tsx
+export default function Custom404() {
+  return <h1>404 - Page Not Found</h1>
+}
+```
+
+### 500 page
+
+Create `pages/500.tsx` for a custom server error page.
+
+```tsx pages/500.tsx
+export default function Custom500() {
+  return <h1>500 - Server-side error occurred</h1>
+}
+```

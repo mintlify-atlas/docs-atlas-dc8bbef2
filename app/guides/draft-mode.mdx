@@ -1,0 +1,141 @@
+---
+title: Draft mode
+description: Learn how to use Draft Mode in Next.js to preview headless CMS draft content by bypassing static generation caching.
+---
+
+Draft Mode lets you preview unpublished content from a headless CMS without rebuilding your entire site. It switches statically generated pages to dynamic rendering for the duration of the preview session.
+
+## How it works
+
+When Draft Mode is enabled, Next.js sets a `__prerender_bypass` cookie. Subsequent requests containing this cookie render pages dynamically at request time instead of serving cached static output.
+
+## Setup
+
+<Steps>
+  <Step title="Create a draft Route Handler">
+    Create a Route Handler that enables Draft Mode:
+
+    ```ts filename="app/api/draft/route.ts"
+    import { draftMode } from 'next/headers'
+
+    export async function GET(request: Request) {
+      const draft = await draftMode()
+      draft.enable()
+      return new Response('Draft mode is enabled')
+    }
+    ```
+
+    Visit `/api/draft` to test—check the browser's DevTools for the `Set-Cookie` response header with `__prerender_bypass`.
+  </Step>
+
+  <Step title="Secure the Route Handler with a secret token">
+    In production, secure your draft URL with a secret token shared between your Next.js app and your headless CMS:
+
+    ```ts filename="app/api/draft/route.ts"
+    import { draftMode } from 'next/headers'
+    import { redirect } from 'next/navigation'
+
+    export async function GET(request: Request) {
+      const { searchParams } = new URL(request.url)
+      const secret = searchParams.get('secret')
+      const slug = searchParams.get('slug')
+
+      // Validate the secret token
+      if (secret !== process.env.DRAFT_SECRET_TOKEN || !slug) {
+        return new Response('Invalid token', { status: 401 })
+      }
+
+      // Fetch the CMS to verify the slug exists
+      const post = await getPostBySlug(slug)
+      if (!post) {
+        return new Response('Invalid slug', { status: 401 })
+      }
+
+      // Enable Draft Mode
+      const draft = await draftMode()
+      draft.enable()
+
+      // Redirect to the post path
+      // Don't redirect to searchParams.slug to prevent open redirect vulnerabilities
+      redirect(post.slug)
+    }
+    ```
+
+    Configure your CMS to use a draft URL like:
+
+    ```
+    https://your-site.com/api/draft?secret=MY_TOKEN&slug=/posts/my-post
+    ```
+  </Step>
+
+  <Step title="Read draft mode in your page">
+    Check `draftMode().isEnabled` to switch between draft and production data sources:
+
+    ```tsx filename="app/page.tsx"
+    import { draftMode } from 'next/headers'
+
+    async function getData() {
+      const { isEnabled } = await draftMode()
+
+      const url = isEnabled
+        ? 'https://draft.example.com'
+        : 'https://production.example.com'
+
+      const res = await fetch(url)
+      return res.json()
+    }
+
+    export default async function Page() {
+      const { title, desc } = await getData()
+
+      return (
+        <main>
+          <h1>{title}</h1>
+          <p>{desc}</p>
+        </main>
+      )
+    }
+    ```
+
+    When `isEnabled` is `true`, data is fetched at request time rather than at build time.
+  </Step>
+</Steps>
+
+## Disabling draft mode
+
+Create an endpoint to disable draft mode:
+
+```ts filename="app/api/disable-draft/route.ts"
+import { draftMode } from 'next/headers'
+
+export async function GET() {
+  const draft = await draftMode()
+  draft.disable()
+  return new Response('Draft mode disabled')
+}
+```
+
+## Checking draft mode status
+
+You can read the draft mode status in any Server Component:
+
+```tsx filename="app/layout.tsx"
+import { draftMode } from 'next/headers'
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { isEnabled } = await draftMode()
+
+  return (
+    <html>
+      <body>
+        {isEnabled && <div>Draft mode is active</div>}
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+<Note>
+  Draft Mode is incompatible with [static exports](/app/guides/static-exports) since it requires dynamic rendering per request.
+</Note>

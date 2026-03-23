@@ -1,0 +1,99 @@
+---
+title: headers
+description: API reference for the headers() function, used to read HTTP request headers in Server Components.
+---
+
+`headers` is an **async** function that lets you read the HTTP incoming request headers from a [Server Component](/app/getting-started/server-and-client-components).
+
+```typescript app/page.tsx
+import { headers } from 'next/headers'
+
+export default async function Page() {
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent')
+}
+```
+
+## Parameters
+
+`headers` takes no parameters.
+
+## Returns
+
+`headers` returns a **read-only** [Web `Headers`](https://developer.mozilla.org/docs/Web/API/Headers) object.
+
+<ResponseField name="get(name)" type="string | null">
+  Returns the string value of the named header, or `null` if not present.
+</ResponseField>
+
+<ResponseField name="has(name)" type="boolean">
+  Returns `true` if the header exists.
+</ResponseField>
+
+<ResponseField name="keys()" type="IterableIterator<string>">
+  Returns an iterator over all header names.
+</ResponseField>
+
+<ResponseField name="values()" type="IterableIterator<string>">
+  Returns an iterator over all header values.
+</ResponseField>
+
+<ResponseField name="entries()" type="IterableIterator<[string, string]>">
+  Returns an iterator over all `[name, value]` pairs.
+</ResponseField>
+
+<ResponseField name="forEach(callback)" type="void">
+  Executes a callback for each key/value pair.
+</ResponseField>
+
+## Good to know
+
+- `headers` is **async** and returns a promise. Use `async/await` or React's [`use`](https://react.dev/reference/react/use).
+- In Next.js 14 and earlier, `headers` was synchronous. Synchronous access still works in Next.js 15 for backwards compatibility, but is deprecated.
+- The returned `Headers` object is **read-only** — you cannot `set` or `delete` headers.
+- `headers` is a [Request-time API](/app/core-concepts/routing#request-time-apis). Using it opts the route into [dynamic rendering](/app/core-concepts/routing#dynamic-rendering).
+
+## Examples
+
+### Forwarding the Authorization header
+
+```typescript app/page.tsx
+import { headers } from 'next/headers'
+
+export default async function Page() {
+  const authorization = (await headers()).get('authorization')
+  const res = await fetch('https://api.example.com/user', {
+    headers: { authorization }, // forward the authorization header
+  })
+  const user = await res.json()
+
+  return <h1>{user.name}</h1>
+}
+```
+
+### Reading multiple headers
+
+```typescript app/page.tsx
+import { headers } from 'next/headers'
+
+export default async function Page() {
+  const headersList = await headers()
+
+  return (
+    <ul>
+      {[...headersList.entries()].map(([name, value]) => (
+        <li key={name}>
+          {name}: {value}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.0.0-RC` | `headers` is now async. A [codemod](https://nextjs.org/docs/app/guides/upgrading/codemods) is available. |
+| `v13.0.0` | `headers` introduced. |

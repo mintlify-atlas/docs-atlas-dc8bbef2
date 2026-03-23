@@ -1,0 +1,110 @@
+---
+title: next start
+description: Start a production Next.js server after building with next build.
+---
+
+`next start` starts the application in production mode. The application must be compiled first with [`next build`](/api-reference/cli/next-build).
+
+```bash
+next start [directory] [options]
+```
+
+## Options
+
+<ParamField path="[directory]" type="string">
+  The directory containing the Next.js application. Defaults to the current working directory.
+</ParamField>
+
+<ParamField path="-p / --port <port>" type="number" default="3000">
+  Port number to listen on. Can also be set via the `PORT` environment variable.
+</ParamField>
+
+<ParamField path="-H / --hostname <hostname>" type="string" default="0.0.0.0">
+  Hostname to bind the server to.
+</ParamField>
+
+<ParamField path="--keepAliveTimeout <milliseconds>" type="number">
+  Maximum time in milliseconds to wait before closing inactive keep-alive connections. Important when deploying behind a load balancer.
+</ParamField>
+
+<ParamField path="--experimental-cpu-prof" type="boolean">
+  Enable CPU profiling via V8's inspector. Profiles are saved to `.next/cpu-profiles/` on process exit.
+</ParamField>
+
+<ParamField path="-h / --help" type="boolean">
+  Show all available options.
+</ParamField>
+
+## Environment variables at start time
+
+Environment variables loaded by `next start` depend on where they are defined:
+
+| Source | When loaded | Notes |
+|---|---|---|
+| `.env` | Build time | Values baked into the bundle |
+| `.env.local` | Build time | Local overrides, not committed |
+| `.env.production` | Build time | Production-only values |
+| System environment | Runtime | Set in your deployment platform or shell |
+
+`NEXT_PUBLIC_*` variables are inlined at build time and cannot be changed at start time. Server-only variables (without the `NEXT_PUBLIC_` prefix) can be changed between builds if you read them at request time.
+
+<Note>
+`PORT` cannot be set in `.env` files. The HTTP server starts before environment files are loaded. Pass `PORT` as a system environment variable or use the `-p` flag.
+</Note>
+
+## Examples
+
+### Start on a custom port
+
+```bash
+next start -p 8080
+# or
+PORT=8080 next start
+```
+
+### Bind to a specific hostname
+
+```bash
+next start --hostname 127.0.0.1
+```
+
+### Configure keep-alive timeout for a load balancer
+
+When deploying behind a load balancer (e.g. AWS ELB/ALB), set the keep-alive timeout to a value greater than the load balancer's idle timeout to prevent connection termination errors:
+
+```bash
+next start --keepAliveTimeout 70000
+```
+
+### CPU profiling
+
+```bash
+next start --experimental-cpu-prof
+```
+
+Profiles are saved as `start-main-*.cpuprofile` in `.next/cpu-profiles/`. Open them in Chrome DevTools under the Performance tab.
+
+### Serving a standalone build
+
+If you built with `output: 'standalone'`, use the generated minimal server instead of `next start`:
+
+```bash
+# Copy static assets first
+cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+
+# Start the standalone server
+node .next/standalone/server.js
+```
+
+The standalone server reads `PORT` and `HOSTNAME` environment variables:
+
+```bash
+PORT=8080 HOSTNAME=0.0.0.0 node .next/standalone/server.js
+```
+
+## Version history
+
+| Version | Changes |
+|---|---|
+| `v15.0.0` | Turbopack stable for `dev`; `next start` unchanged |
+| `v13.0.0` | App Router support added |

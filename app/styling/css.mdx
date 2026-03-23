@@ -1,0 +1,198 @@
+---
+title: CSS
+description: Style your Next.js application with CSS Modules, global CSS, and external stylesheets.
+---
+
+Next.js supports several CSS approaches out of the box. Use whichever fits your project:
+
+<Columns cols={2}>
+  <Card title="CSS Modules" icon="layers" href="#css-modules">
+    Locally scoped styles with auto-generated class names.
+  </Card>
+  <Card title="Global CSS" icon="globe" href="#global-css">
+    Apply styles across every route from a single file.
+  </Card>
+  <Card title="External stylesheets" icon="package" href="#external-stylesheets">
+    Import CSS from npm packages directly in the App Router.
+  </Card>
+  <Card title="Tailwind CSS" href="/app/styling/tailwind-css" icon="wind">
+    Utility-first CSS framework built for Next.js.
+  </Card>
+</Columns>
+
+## CSS Modules
+
+CSS Modules locally scope CSS by generating unique class names. This lets you reuse the same class name across different files without naming collisions.
+
+Create a file with the `.module.css` extension and import it into any component inside the `app` directory:
+
+<CodeGroup>
+
+```css app/blog/blog.module.css
+.blog {
+  padding: 24px;
+}
+```
+
+```tsx app/blog/page.tsx
+import styles from './blog.module.css'
+
+export default function Page() {
+  return <main className={styles.blog}></main>
+}
+```
+
+```jsx app/blog/page.js
+import styles from './blog.module.css'
+
+export default function Page() {
+  return <main className={styles.blog}></main>
+}
+```
+
+</CodeGroup>
+
+<Note>
+CSS Module files must end in `.module.css`. Regular `.css` files are treated as global CSS and will not produce unique class names.
+</Note>
+
+## Global CSS
+
+Global CSS applies styles across your entire application. Create a `globals.css` file and import it in your root layout to apply the styles to **every route**:
+
+<CodeGroup>
+
+```css app/globals.css
+body {
+  padding: 20px 20px 60px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+```
+
+```tsx app/layout.tsx
+// These styles apply to every route in the application
+import './globals.css'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+// These styles apply to every route in the application
+import './globals.css'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+<Warning>
+Global CSS can be imported into any layout, page, or component in the `app` directory. However, since Next.js uses React's built-in stylesheet support to integrate with Suspense, stylesheets are not currently removed as you navigate between routes—which can lead to conflicts. Reserve global styles for truly global CSS (like resets or base typography). Use [CSS Modules](#css-modules) for component-specific styles.
+</Warning>
+
+## External stylesheets
+
+Stylesheets published by external packages can be imported anywhere in the `app` directory, including inside colocated components:
+
+<CodeGroup>
+
+```tsx app/layout.tsx
+import 'bootstrap/dist/css/bootstrap.css'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className="container">{children}</body>
+    </html>
+  )
+}
+```
+
+```jsx app/layout.js
+import 'bootstrap/dist/css/bootstrap.css'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body className="container">{children}</body>
+    </html>
+  )
+}
+```
+
+</CodeGroup>
+
+<Tip>
+In React 19, you can also use `<link rel="stylesheet" href="..." />` directly inside components.
+</Tip>
+
+## CSS ordering and merging
+
+Next.js optimizes CSS during production builds by automatically chunking (merging) stylesheets. The **order of your CSS** depends on the **order you import styles in your code**.
+
+For example, `base-button.module.css` will be ordered before `page.module.css` since `<BaseButton>` is imported first:
+
+<CodeGroup>
+
+```tsx page.tsx
+import { BaseButton } from './base-button'
+import styles from './page.module.css'
+
+export default function Page() {
+  return <BaseButton className={styles.primary} />
+}
+```
+
+```tsx base-button.tsx
+import styles from './base-button.module.css'
+
+export function BaseButton() {
+  return <button className={styles.primary} />
+}
+```
+
+</CodeGroup>
+
+### Recommendations
+
+To keep CSS ordering predictable:
+
+- Contain CSS imports to a single JavaScript or TypeScript entry file where possible.
+- Import global styles and Tailwind stylesheets at the root of your application.
+- Use [Tailwind CSS](/app/styling/tailwind-css) for most styling needs.
+- Use CSS Modules for component-specific styles when Tailwind utilities aren't sufficient.
+- Use a consistent naming convention: `<name>.module.css` rather than `<name>.tsx`.
+- Extract shared styles into shared components to avoid duplicate imports.
+- Disable linters or formatters that auto-sort imports, such as ESLint's `sort-imports` rule.
+- Use the [`cssChunking`](https://nextjs.org/api-reference/config/next-config-js) option in `next.config.js` to control how CSS is chunked.
+
+## Development vs production
+
+| Environment | Behavior |
+|---|---|
+| `next dev` | CSS updates apply instantly via Fast Refresh |
+| `next build` | All CSS is concatenated into minified, code-split `.css` files |
+
+<Note>
+CSS ordering can behave differently in development. Always verify the final CSS order by checking a production build with `next build`.
+</Note>

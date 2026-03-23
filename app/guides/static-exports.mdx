@@ -1,0 +1,187 @@
+---
+title: Static exports
+description: Learn how to export your Next.js app as a static site, what features are supported, and how to deploy the output.
+---
+
+Next.js supports starting as a static site or SPA, then optionally upgrading to server features later. When you run `next build` with `output: 'export'`, Next.js generates an HTML file per route, enabling deployment to any static host.
+
+## Configuration
+
+Set `output: 'export'` in `next.config.js`:
+
+```js filename="next.config.js"
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',
+
+  // Optional: Change links `/me` -> `/me/` and emit `/me.html` -> `/me/index.html`
+  // trailingSlash: true,
+
+  // Optional: Prevent automatic `/me` -> `/me/` redirect
+  // skipTrailingSlashRedirect: true,
+
+  // Optional: Change the output directory from `out` to `dist`
+  // distDir: 'dist',
+}
+
+module.exports = nextConfig
+```
+
+After running `next build`, Next.js creates an `out/` folder with your HTML/CSS/JS assets.
+
+## Supported features
+
+### Server Components
+
+Server Components run during `next build`, similar to static-site generation. The rendered HTML is output for the initial page load and a static payload for client navigation.
+
+```tsx filename="app/page.tsx"
+export default async function Page() {
+  // This fetch runs on the server during `next build`
+  const res = await fetch('https://api.example.com/...')
+  const data = await res.json()
+  return <main>...</main>
+}
+```
+
+### Client Components
+
+Client Components are prerendered to HTML at build time. For client-side data fetching, use SWR:
+
+```tsx filename="app/other/page.tsx"
+'use client'
+
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+export default function Page() {
+  const { data, error } = useSWR('https://api.example.com/posts/1', fetcher)
+  if (error) return 'Failed to load'
+  if (!data) return 'Loading...'
+  return data.title
+}
+```
+
+### Route Handlers
+
+Route Handlers render a static response during `next build`. Only `GET` requests are supported:
+
+```ts filename="app/data.json/route.ts"
+export async function GET() {
+  return Response.json({ name: 'Lee' })
+}
+```
+
+The above produces `out/data.json` containing `{ "name": "Lee" }`.
+
+### Image optimization
+
+Use a custom image loader to optimize images via a third-party service:
+
+```js filename="next.config.js"
+const nextConfig = {
+  output: 'export',
+  images: {
+    loader: 'custom',
+    loaderFile: './my-loader.ts',
+  },
+}
+```
+
+```ts filename="my-loader.ts"
+export default function cloudinaryLoader({
+  src,
+  width,
+  quality,
+}: {
+  src: string
+  width: number
+  quality?: number
+}) {
+  const params = ['f_auto', 'c_limit', `w_${width}`, `q_${quality || 'auto'}`]
+  return `https://res.cloudinary.com/demo/image/upload/${params.join(',')}${src}`
+}
+```
+
+### Browser APIs
+
+Client Components are prerendered on the server during `next build`, so browser APIs like `window` and `localStorage` are unavailable at that point. Access them only after mounting:
+
+```jsx
+'use client'
+
+import { useEffect } from 'react'
+
+export default function ClientComponent() {
+  useEffect(() => {
+    console.log(window.innerHeight)
+  }, [])
+
+  return ...
+}
+```
+
+## Unsupported features
+
+Features requiring a Node.js server or dynamic logic at request time are not supported with static exports:
+
+<Warning>
+  Using any of these with `output: 'export'` will result in a build error:
+</Warning>
+
+- Dynamic Routes without `generateStaticParams()`
+- Route Handlers that read from the request
+- Cookies and Headers APIs
+- Rewrites, Redirects, Headers config
+- Middleware
+- Incremental Static Regeneration
+- Default image optimization loader
+- Draft Mode
+- Server Actions
+- Intercepting Routes
+
+## Deploying
+
+After `next build`, the `out/` folder contains your static assets. Given routes `/` and `/blog/[id]`, Next.js generates:
+
+```
+out/index.html
+out/404.html
+out/blog/post-1.html
+out/blog/post-2.html
+```
+
+Deploy to any static host. For Nginx:
+
+```nginx filename="nginx.conf"
+server {
+  listen 80;
+  server_name acme.com;
+  root /var/www/out;
+
+  location / {
+    try_files $uri $uri.html $uri/ =404;
+  }
+
+  # Required when `trailingSlash: false`
+  location /blog/ {
+    rewrite ^/blog/(.*)$ /blog/$1.html break;
+  }
+
+  error_page 404 /404.html;
+  location = /404.html {
+    internal;
+  }
+}
+```
+
+You can also deploy to Vercel, GitHub Pages, Netlify, AWS S3, or any CDN that serves static files.
+
+## Version history
+
+| Version | Changes |
+|---------|----------|
+| `v14.0.0` | `next export` removed in favor of `output: 'export'` |
+| `v13.4.0` | App Router static export with Server Components and Route Handlers |
+| `v13.3.0` | `next export` deprecated |

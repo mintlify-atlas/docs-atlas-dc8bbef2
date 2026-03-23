@@ -1,0 +1,163 @@
+---
+title: Tailwind CSS
+description: Set up and use Tailwind CSS with the Next.js App Router.
+---
+
+[Tailwind CSS](https://tailwindcss.com/) is a utility-first CSS framework that works seamlessly with Next.js. This page covers installation and usage in the App Router.
+
+## Installation
+
+<Steps>
+  <Step title="Install Tailwind CSS and the PostCSS plugin">
+    <Tabs>
+      <Tab title="npm">
+        ```bash
+        npm install -D tailwindcss @tailwindcss/postcss
+        ```
+      </Tab>
+      <Tab title="pnpm">
+        ```bash
+        pnpm add -D tailwindcss @tailwindcss/postcss
+        ```
+      </Tab>
+      <Tab title="yarn">
+        ```bash
+        yarn add -D tailwindcss @tailwindcss/postcss
+        ```
+      </Tab>
+      <Tab title="bun">
+        ```bash
+        bun add -D tailwindcss @tailwindcss/postcss
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Add the PostCSS plugin">
+    Create or update `postcss.config.mjs` at the project root:
+
+    ```js postcss.config.mjs
+    export default {
+      plugins: {
+        '@tailwindcss/postcss': {},
+      },
+    }
+    ```
+  </Step>
+
+  <Step title="Import Tailwind in your global CSS file">
+    ```css app/globals.css
+    @import 'tailwindcss';
+    ```
+  </Step>
+
+  <Step title="Import the CSS file in your root layout">
+    <CodeGroup>
+
+    ```tsx app/layout.tsx
+    import './globals.css'
+
+    export default function RootLayout({
+      children,
+    }: {
+      children: React.ReactNode
+    }) {
+      return (
+        <html lang="en">
+          <body>{children}</body>
+        </html>
+      )
+    }
+    ```
+
+    ```jsx app/layout.js
+    import './globals.css'
+
+    export default function RootLayout({ children }) {
+      return (
+        <html lang="en">
+          <body>{children}</body>
+        </html>
+      )
+    }
+    ```
+
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Usage
+
+Once configured, use Tailwind utility classes directly on any element:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+export default function Page() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <h1 className="text-4xl font-bold">Welcome to Next.js!</h1>
+    </main>
+  )
+}
+```
+
+```jsx app/page.js
+export default function Page() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <h1 className="text-4xl font-bold">Welcome to Next.js!</h1>
+    </main>
+  )
+}
+```
+
+</CodeGroup>
+
+## Using with CSS Modules
+
+Tailwind and CSS Modules can be used together. Tailwind's `@apply` directive lets you compose utilities into a module class:
+
+```css app/button/button.module.css
+.btn {
+  @apply rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white;
+}
+
+.btn:hover {
+  @apply bg-blue-700;
+}
+```
+
+```tsx app/button/Button.tsx
+import styles from './button.module.css'
+
+export function Button({ children }: { children: React.ReactNode }) {
+  return <button className={styles.btn}>{children}</button>
+}
+```
+
+## Dark mode
+
+Tailwind's dark mode works with Next.js. Add the `dark` variant to your classes:
+
+```tsx app/page.tsx
+export default function Page() {
+  return (
+    <div className="bg-white dark:bg-gray-900">
+      <p className="text-gray-900 dark:text-gray-100">Hello world</p>
+    </div>
+  )
+}
+```
+
+To enable class-based dark mode, configure it in your CSS:
+
+```css app/globals.css
+@import 'tailwindcss';
+
+@variant dark (&:where(.dark, .dark *));
+```
+
+<Note>
+If you need support for very old browsers, see the [Tailwind CSS v3 setup guide](https://tailwindcss.com/docs/installation). The `@tailwindcss/postcss` plugin targets modern browsers by default.
+</Note>

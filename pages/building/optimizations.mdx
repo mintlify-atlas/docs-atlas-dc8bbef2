@@ -1,0 +1,227 @@
+---
+title: Optimizations
+description: Image optimization, font optimization, script loading strategies, lazy loading, and bundle analysis in the Pages Router.
+---
+
+Next.js includes built-in optimizations for images, fonts, scripts, and code-splitting. Most of these work the same way in both the Pages Router and App Router.
+
+## Image optimization
+
+The `next/image` component automatically optimizes images on demand:
+
+- Serves modern formats (WebP, AVIF).
+- Resizes images to match the rendered size.
+- Lazy loads images by default.
+- Prevents [Cumulative Layout Shift](https://web.dev/cls/) with reserved space.
+
+```tsx pages/index.tsx
+import Image from 'next/image'
+
+export default function Home() {
+  return (
+    <Image
+      src="/images/hero.jpg"
+      alt="Hero image showing the product dashboard"
+      width={800}
+      height={600}
+      priority
+    />
+  )
+}
+```
+
+### Key props
+
+| Prop | Description |
+| --- | --- |
+| `src` | Image path or URL. |
+| `alt` | Required descriptive text for accessibility. |
+| `width` and `height` | Intrinsic dimensions in pixels (required for local images in static layout). |
+| `priority` | Preloads the image. Use for the largest above-the-fold image (LCP). |
+| `fill` | Fills the parent element. Use with `sizes` for responsive images. |
+| `sizes` | Describes how wide the image is at different viewport widths. |
+| `quality` | Integer from 1–100. Defaults to 75. |
+
+### Remote images
+
+To allow images from external domains, add them to `next.config.js`:
+
+```js next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'assets.example.com',
+      },
+    ],
+  },
+}
+
+module.exports = nextConfig
+```
+
+## Font optimization
+
+Use `next/font` to load fonts with zero layout shift. Fonts are downloaded at build time and self-hosted from your own domain.
+
+### Google Fonts
+
+```tsx pages/_app.tsx
+import type { AppProps } from 'next/app'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <main className={inter.className}>
+      <Component {...pageProps} />
+    </main>
+  )
+}
+```
+
+### Local fonts
+
+```tsx pages/_app.tsx
+import localFont from 'next/font/local'
+
+const myFont = localFont({ src: '../public/fonts/MyFont.woff2' })
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <main className={myFont.className}>
+      <Component {...pageProps} />
+    </main>
+  )
+}
+```
+
+`next/font` ensures font files are not sent to Google (or any third party) at request time, improving privacy and performance.
+
+<Note>
+`next/font` works the same way in the App Router. Apply the font class to your root `layout.tsx` to use it site-wide.
+</Note>
+
+## Script loading
+
+The `next/script` component lets you control when third-party scripts load:
+
+```tsx pages/index.tsx
+import Script from 'next/script'
+
+export default function Home() {
+  return (
+    <>
+      <Script
+        src="https://example.com/analytics.js"
+        strategy="afterInteractive"
+      />
+    </>
+  )
+}
+```
+
+### Loading strategies
+
+| Strategy | When it loads |
+| --- | --- |
+| `beforeInteractive` | Before the page becomes interactive. For critical scripts only. Place in `_document.tsx`. |
+| `afterInteractive` | After the page is interactive. Default. |
+| `lazyOnload` | During idle time. For low-priority scripts like chat widgets. |
+| `worker` | In a web worker (requires Partytown). |
+
+### Inline scripts
+
+```tsx
+<Script id="my-script" strategy="afterInteractive">
+  {`
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+  `}
+</Script>
+```
+
+Always add an `id` to inline scripts so Next.js can track and optimize them.
+
+## Lazy loading
+
+Next.js supports lazy loading for components and libraries using `next/dynamic`.
+
+### Dynamic component imports
+
+```tsx
+import dynamic from 'next/dynamic'
+
+const HeavyChart = dynamic(() => import('../components/HeavyChart'), {
+  loading: () => <p>Loading chart...</p>,
+})
+
+export default function Dashboard() {
+  return <HeavyChart />
+}
+```
+
+The `HeavyChart` component is only downloaded when it first renders.
+
+### Disabling SSR for a component
+
+Some libraries (like those that access `window`) cannot run on the server. Disable SSR for them:
+
+```tsx
+const Map = dynamic(() => import('../components/Map'), { ssr: false })
+```
+
+### Lazy loading libraries
+
+You can also lazy load third-party libraries inside event handlers:
+
+```tsx
+import { useState } from 'react'
+
+export default function MarkdownEditor() {
+  const [result, setResult] = useState('')
+
+  return (
+    <>
+      <input
+        onChange={async (e) => {
+          const { marked } = await import('marked')
+          setResult(marked(e.target.value))
+        }}
+      />
+      <div dangerouslySetInnerHTML={{ __html: result }} />
+    </>
+  )
+}
+```
+
+## Bundle analysis
+
+Use `@next/bundle-analyzer` to visualize which modules contribute to your bundle size.
+
+```bash
+npm install --save-dev @next/bundle-analyzer
+```
+
+```js next.config.js
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+module.exports = withBundleAnalyzer(nextConfig)
+```
+
+Run the analyzer:
+
+```bash
+ANALYZE=true npm run build
+```
+
+This opens two treemap views in your browser: one for the client bundle and one for the server bundle.

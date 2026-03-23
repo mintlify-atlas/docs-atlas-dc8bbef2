@@ -1,0 +1,144 @@
+---
+title: "page.js"
+description: "API reference for the page.js file convention. Pages define unique UI for a route and receive dynamic params and search parameters as props."
+---
+
+A `page` file defines UI that is unique to a route. Pages are Server Components by default and can be made async to fetch data.
+
+```jsx app/blog/[slug]/page.js
+export default function Page({ params, searchParams }) {
+  return <h1>My Page</h1>
+}
+```
+
+## Good to know
+
+- Supported file extensions: `.js`, `.jsx`, `.tsx`
+- A page is always the **leaf** of the route subtree
+- A `page` file is required to make a route segment publicly accessible
+- Pages are Server Components by default but can use the `'use client'` directive
+- In the component hierarchy, `page.js` is the innermost file, wrapped by `loading.js`, `error.js`, `template.js`, and `layout.js`
+
+## Props
+
+<ParamField path="params" type="Promise<object>">
+  A promise that resolves to the dynamic route parameters from the root segment down to the page.
+
+  ```jsx app/shop/[slug]/page.js
+  export default async function Page({ params }) {
+    const { slug } = await params
+  }
+  ```
+
+  | Route | URL | `params` |
+  | --- | --- | --- |
+  | `app/shop/[slug]/page.js` | `/shop/1` | `Promise<{ slug: '1' }>` |
+  | `app/shop/[category]/[item]/page.js` | `/shop/1/2` | `Promise<{ category: '1', item: '2' }>` |
+  | `app/shop/[...slug]/page.js` | `/shop/1/2` | `Promise<{ slug: ['1', '2'] }>` |
+
+  Use `async/await` or React's `use()` to read the value.
+</ParamField>
+
+<ParamField path="searchParams" type="Promise<object>">
+  A promise that resolves to the current URL's search parameters.
+
+  ```jsx app/shop/page.js
+  export default async function Page({ searchParams }) {
+    const filters = (await searchParams).filters
+  }
+  ```
+
+  | URL | `searchParams` |
+  | --- | --- |
+  | `/shop?a=1` | `Promise<{ a: '1' }>` |
+  | `/shop?a=1&b=2` | `Promise<{ a: '1', b: '2' }>` |
+  | `/shop?a=1&a=2` | `Promise<{ a: ['1', '2'] }>` |
+
+  <Note>
+    `searchParams` is a request-time API. Using it opts the page into dynamic rendering. It returns a plain object, not a `URLSearchParams` instance.
+  </Note>
+</ParamField>
+
+## TypeScript helper
+
+Use the global `PageProps` helper for strongly typed `params` and `searchParams`:
+
+```tsx app/blog/[slug]/page.tsx
+export default async function Page(props: PageProps<'/blog/[slug]'>) {
+  const { slug } = await props.params
+  return <h1>Blog Post: {slug}</h1>
+}
+```
+
+<Note>Types are generated during `next dev`, `next build`, or `next typegen`. `PageProps` is globally available and does not need to be imported.</Note>
+
+## Examples
+
+### Displaying content based on `params`
+
+```jsx app/blog/[slug]/page.js
+export default async function Page({ params }) {
+  const { slug } = await params
+  return <h1>Blog Post: {slug}</h1>
+}
+```
+
+### Filtering with `searchParams`
+
+```jsx app/shop/page.js
+export default async function Page({ searchParams }) {
+  const { page = '1', sort = 'asc', query = '' } = await searchParams
+
+  return (
+    <div>
+      <h1>Product Listing</h1>
+      <p>Search: {query}</p>
+      <p>Page: {page}</p>
+      <p>Sort: {sort}</p>
+    </div>
+  )
+}
+```
+
+### Reading params in Client Components
+
+Use React's `use()` function to unwrap the promise in a Client Component:
+
+```jsx app/page.js
+'use client'
+
+import { use } from 'react'
+
+export default function Page({ params, searchParams }) {
+  const { slug } = use(params)
+  const { query } = use(searchParams)
+}
+```
+
+### Generating static pages
+
+Export `generateStaticParams` to statically generate pages at build time:
+
+```jsx app/blog/[slug]/page.js
+export async function generateStaticParams() {
+  const posts = await fetch('https://api.example.com/posts').then(r => r.json())
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+
+export default async function Page({ params }) {
+  const { slug } = await params
+  const post = await fetch(`https://api.example.com/posts/${slug}`).then(r => r.json())
+
+  return <h1>{post.title}</h1>
+}
+```
+
+## Version history
+
+| Version | Changes |
+| --- | --- |
+| `v15.0.0-RC` | `params` and `searchParams` are now promises |
+| `v13.0.0` | `page` introduced |
