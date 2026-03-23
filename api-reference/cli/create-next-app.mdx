@@ -86,13 +86,13 @@ bun create next-app [project-name] [options]
 
 ### Bundler
 
-<ParamField path="--turbopack" type="boolean">
-  Force Turbopack in the generated `package.json`. Turbopack is enabled by default in Next.js 15+.
+<ParamField path="--rspack" type="boolean">
+  Enable Rspack as the bundler in the generated project.
 </ParamField>
 
-<ParamField path="--webpack" type="boolean">
-  Force Webpack in the generated `package.json`.
-</ParamField>
+<Note>
+Turbopack is the default bundler for Next.js development. You can switch to webpack at any time using `next dev --webpack` or `next build --webpack` in your project.
+</Note>
 
 ### Package manager
 

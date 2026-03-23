@@ -58,11 +58,27 @@ next build [directory] [options]
   Use an experimental build mode. Choices: `'compile'`, `'generate'`, `'default'`.
 </ParamField>
 
+<ParamField path="--experimental-analyze" type="boolean">
+  Analyze bundle output using the bundle explorer. Only compatible with the Turbopack bundler.
+</ParamField>
+
+<ParamField path="--experimental-debug-memory-usage" type="boolean">
+  Enable memory profiling features to help debug memory consumption during the build.
+</ParamField>
+
+<ParamField path="--experimental-upload-trace <traceUrl>" type="string">
+  Report a subset of the debugging trace to a remote HTTP URL. Includes sensitive data.
+</ParamField>
+
+<ParamField path="--experimental-next-config-strip-types" type="boolean">
+  Use Node.js native TypeScript resolution for `next.config.ts` or `next.config.mts`.
+</ParamField>
+
 <ParamField path="--debug-prerender" type="boolean">
   Debug prerender errors in a development-like build. Do not deploy builds produced with this flag.
 </ParamField>
 
-<ParamField path="--debug-build-paths=<patterns>" type="string">
+<ParamField path="--debug-build-paths <patterns>" type="string">
   Build only specific routes (comma-separated file paths or globs). Useful for faster targeted debugging.
 </ParamField>
 
@@ -76,13 +92,13 @@ next build [directory] [options]
 
 ## Build output analysis
 
-The build output shows route types and sizes. Use `next experimental-analyze` for detailed bundle composition:
+The build output shows route types and sizes. To analyze bundle composition in detail, use the `--experimental-analyze` flag with Turbopack:
 
 ```bash
-npx next experimental-analyze
+next build --experimental-analyze
 ```
 
-This opens an interactive bundle explorer in the browser without producing build artifacts.
+This runs a Turbopack build and opens an interactive bundle explorer in the browser.
 
 ## Standalone output
 

@@ -27,12 +27,24 @@ Development builds are output to `.next/dev` instead of `.next`, so `next dev` a
   Hostname to listen on. Set to `0.0.0.0` to make the server available on all network interfaces.
 </ParamField>
 
-<ParamField path="--turbopack" type="boolean">
-  Force Turbopack (the default bundler). Also available as `--turbo`.
+<ParamField path="--turbopack / --turbo" type="boolean">
+  Start development mode using Turbopack (default bundler in Next.js 15+).
 </ParamField>
 
 <ParamField path="--webpack" type="boolean">
-  Use Webpack instead of the default Turbopack bundler.
+  Start development mode using webpack instead of the default Turbopack bundler.
+</ParamField>
+
+<ParamField path="--disable-source-maps" type="boolean" default="false">
+  Disable source map generation in the development server.
+</ParamField>
+
+<ParamField path="--no-server-fast-refresh" type="boolean">
+  Disable server-side Fast Refresh. When set, changes to server-side code require a full page reload instead of a soft refresh.
+</ParamField>
+
+<ParamField path="--inspect [[host:]port]" type="string">
+  Enable the Node.js inspector for debugging server-side code. Accepts an optional `host:port` (default `127.0.0.1:9229`).
 </ParamField>
 
 <ParamField path="--experimental-https" type="boolean">
@@ -52,7 +64,11 @@ Development builds are output to `.next/dev` instead of `.next`, so `next dev` a
 </ParamField>
 
 <ParamField path="--experimental-upload-trace <traceUrl>" type="string">
-  Report a subset of the debugging trace to a remote HTTP URL.
+  Report a subset of the debugging trace to a remote HTTP URL. Includes sensitive data.
+</ParamField>
+
+<ParamField path="--experimental-next-config-strip-types" type="boolean">
+  Use Node.js native TypeScript resolution for `next.config.ts` or `next.config.mts`.
 </ParamField>
 
 <ParamField path="--experimental-cpu-prof" type="boolean">
@@ -78,7 +94,7 @@ PORT=4000 next dev
 ```
 
 <Note>
-`PORT` cannot be set in `.env` files—the HTTP server starts before environment files are loaded.
+`PORT` cannot be set in `.env` files — the HTTP server starts before environment files are loaded.
 </Note>
 
 ### Expose to the network
@@ -87,7 +103,7 @@ PORT=4000 next dev
 next dev --hostname 0.0.0.0
 ```
 
-This makes the dev server accessible at your machine’s LAN IP address, useful for testing on mobile devices.
+This makes the dev server accessible at your machine's LAN IP address, useful for testing on mobile devices.
 
 ### HTTPS in development
 
@@ -109,6 +125,14 @@ next dev --experimental-https \
 `--experimental-https` is for development only. Use a certificate from a trusted authority in production.
 </Warning>
 
+### Debugging server-side code
+
+```bash
+next dev --inspect
+```
+
+Opens the Node.js inspector on the default port. Connect with Chrome DevTools at `chrome://inspect` or any editor with Node.js debug support.
+
 ### CPU profiling
 
 ```bash
@@ -121,5 +145,4 @@ Profiles are saved to `.next/cpu-profiles/` when you stop the server (`Ctrl+C`).
 
 | Version | Changes |
 |---|---|
-| `v16.0.0` | Turbopack is the default bundler |
 | `v15.0.0` | Turbopack for `dev` stable |
