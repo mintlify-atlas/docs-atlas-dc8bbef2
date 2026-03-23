@@ -1,0 +1,229 @@
+{
+  "projectType": "framework",
+  "projectName": "Next.js",
+  "projectDescription": "A React framework for building full-stack web applications with hybrid static and server rendering, file-based routing, and built-in optimizations.",
+  "theme": "palm",
+  "primaryColor": "#7c7c7c",
+  "lightColor": "#070707",
+  "darkColor": "#c4c4c4",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "App Router",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "app/getting-started/introduction",
+              "app/getting-started/installation",
+              "app/getting-started/project-structure",
+              "app/getting-started/layouts-and-pages",
+              "app/getting-started/linking-and-navigating",
+              "app/getting-started/server-and-client-components",
+              "app/getting-started/fetching-data",
+              "app/getting-started/mutating-data",
+              "app/getting-started/deploying"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "app/core-concepts/rendering",
+              "app/core-concepts/routing",
+              "app/core-concepts/data-fetching",
+              "app/core-concepts/caching",
+              "app/core-concepts/revalidating",
+              "app/core-concepts/streaming",
+              "app/core-concepts/error-handling"
+            ]
+          },
+          {
+            "group": "Styling",
+            "pages": [
+              "app/styling/css",
+              "app/styling/tailwind-css",
+              "app/styling/sass",
+              "app/styling/css-in-js"
+            ]
+          },
+          {
+            "group": "Optimizations",
+            "pages": [
+              "app/optimizations/images",
+              "app/optimizations/fonts",
+              "app/optimizations/scripts",
+              "app/optimizations/lazy-loading",
+              "app/optimizations/metadata",
+              "app/optimizations/analytics"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "app/guides/authentication",
+              "app/guides/testing",
+              "app/guides/environment-variables",
+              "app/guides/internationalization",
+              "app/guides/static-exports",
+              "app/guides/self-hosting",
+              "app/guides/debugging",
+              "app/guides/open-telemetry",
+              "app/guides/progressive-web-apps",
+              "app/guides/forms",
+              "app/guides/draft-mode",
+              "app/guides/redirecting",
+              "app/guides/single-page-applications",
+              "app/guides/multi-zones",
+              "app/guides/content-security-policy",
+              "app/guides/production-checklist"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Pages Router",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "pages/getting-started/introduction",
+              "pages/getting-started/installation",
+              "pages/getting-started/project-structure"
+            ]
+          },
+          {
+            "group": "Building Your Application",
+            "pages": [
+              "pages/building/routing",
+              "pages/building/rendering",
+              "pages/building/data-fetching",
+              "pages/building/styling",
+              "pages/building/optimizations",
+              "pages/building/configuring",
+              "pages/building/deploying"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Components",
+            "pages": [
+              "api-reference/components/image",
+              "api-reference/components/link",
+              "api-reference/components/script",
+              "api-reference/components/font",
+              "api-reference/components/form"
+            ]
+          },
+          {
+            "group": "File Conventions",
+            "pages": [
+              "api-reference/file-conventions/layout",
+              "api-reference/file-conventions/page",
+              "api-reference/file-conventions/template",
+              "api-reference/file-conventions/loading",
+              "api-reference/file-conventions/error",
+              "api-reference/file-conventions/not-found",
+              "api-reference/file-conventions/route",
+              "api-reference/file-conventions/middleware",
+              "api-reference/file-conventions/instrumentation"
+            ]
+          },
+          {
+            "group": "Functions",
+            "pages": [
+              "api-reference/functions/cookies",
+              "api-reference/functions/headers",
+              "api-reference/functions/redirect",
+              "api-reference/functions/use-router",
+              "api-reference/functions/use-pathname",
+              "api-reference/functions/use-search-params",
+              "api-reference/functions/use-params",
+              "api-reference/functions/generate-static-params",
+              "api-reference/functions/generate-metadata",
+              "api-reference/functions/revalidate-path",
+              "api-reference/functions/revalidate-tag",
+              "api-reference/functions/next-request",
+              "api-reference/functions/next-response",
+              "api-reference/functions/image-response",
+              "api-reference/functions/after",
+              "api-reference/functions/fetch"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api-reference/config/next-config-js",
+              "api-reference/config/typescript",
+              "api-reference/config/eslint",
+              "api-reference/config/edge",
+              "api-reference/config/turbopack"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "api-reference/cli/create-next-app",
+              "api-reference/cli/next-dev",
+              "api-reference/cli/next-build",
+              "api-reference/cli/next-start"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Architecture",
+        "groups": [
+          {
+            "group": "Internals",
+            "pages": [
+              "architecture/overview",
+              "architecture/turbopack",
+              "architecture/fast-refresh",
+              "architecture/compiler",
+              "architecture/accessibility"
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": [
+              "community/contributing",
+              "community/support"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "File-based routing with App Router and Pages Router",
+    "React Server Components and Client Components",
+    "Built-in image, font, and script optimization",
+    "Hybrid static and server-side rendering (SSG, SSR, ISR)",
+    "Turbopack bundler for fast builds and hot reloading",
+    "Route handlers and API routes",
+    "Streaming with React Suspense",
+    "Middleware for edge computing",
+    "Built-in CSS, Sass, and CSS-in-JS support",
+    "TypeScript and ESLint integration out of the box",
+    "Automatic code splitting and prefetching",
+    "Internationalization support"
+  ],
+  "publicApiSurface": [
+    "next/image — Image component with optimization",
+    "next/link — Client-side navigation component",
+    "next/script — Script loading component",
+    "next/font — Font optimization API",
+    "next/navigation — useRouter, usePathname, useSearchParams, useParams",
+    "next/headers — cookies(), headers() server functions",
+    "next/server — NextRequest, NextResponse, middleware utilities",
+    "next/cache — revalidatePath(), revalidateTag(), unstable_cache()",
+    "generateStaticParams() — Static route generation",
+    "generateMetadata() — Dynamic metadata generation",
+    "next.config.js — Framework configuration",
+    "create-next-app — Project scaffolding CLI"
+  ]
+}
